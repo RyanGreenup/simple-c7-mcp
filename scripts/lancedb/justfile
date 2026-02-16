@@ -1,5 +1,9 @@
 package_name := `python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['name'])"`
 
+# Show available commands
+default:
+    @just --list
+
 # Run the CLI without installing
 run *args:
     uv run lance-db-example {{ args }}
@@ -29,3 +33,62 @@ uninstall:
 # Reinstall the CLI tool
 reinstall:
     uv tool install . --force --reinstall
+
+# LanceDB specific commands
+
+# Ingest the sample document
+ingest-sample:
+    uv run lance-db-example ingest sample_document.txt
+
+# Ingest a custom file
+ingest file:
+    uv run lance-db-example ingest {{file}}
+
+# Search for a query
+search query:
+    uv run lance-db-example search "{{query}}"
+
+# Search with limit
+search-limit query limit="10":
+    uv run lance-db-example search "{{query}}" --limit {{limit}}
+
+# List all tables in the database
+list-tables:
+    uv run lance-db-example list-tables
+
+# Show statistics for a table
+stats:
+    uv run lance-db-example stats
+
+# Complete demo workflow
+demo:
+    @echo "🚀 Running complete demo..."
+    @echo ""
+    @echo "Step 1: Ingesting sample document"
+    just ingest-sample
+    @echo ""
+    @echo "Step 2: Searching for 'neural networks'"
+    just search "neural networks"
+    @echo ""
+    @echo "Step 3: Searching for 'supervised learning'"
+    just search "supervised learning"
+    @echo ""
+    @echo "Step 4: Searching for 'healthcare applications'"
+    just search "healthcare applications"
+    @echo ""
+    @echo "Step 5: Listing tables"
+    just list-tables
+    @echo ""
+    @echo "Step 6: Showing statistics"
+    just stats
+    @echo ""
+    @echo "✅ Demo complete!"
+
+# Clean the database
+clean-db:
+    rm -rf lancedb_data
+    @echo "✅ Database cleaned"
+
+# Show CLI help
+help:
+    uv run lance-db-example --help
