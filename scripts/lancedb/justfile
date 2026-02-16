@@ -93,10 +93,53 @@ clean-db:
 help:
     uv run lance-db-example --help
 
+# Open a DuckDB SQL shell with Lance data loaded
+shell db_path="./lancedb_data" table="documents":
+    #!/usr/bin/env python3
+    import sys
+    import subprocess
+    from pathlib import Path
+
+    db_path = "{{ db_path }}"
+    table = "{{ table }}"
+
+    if not Path(db_path).exists():
+        print(f"⚠️  Database not found at: {db_path}")
+        print("Run 'just ingest-sample' first to create a database")
+        sys.exit(1)
+
+    print("🦆 Opening DuckDB SQL shell with Lance data...")
+    print(f"📊 Database: {db_path}")
+    print(f"📋 Table: {table}")
+    print()
+    print("Example queries:")
+    print("  SELECT COUNT(*) FROM docs;")
+    print("  SELECT text, chunk_index FROM docs LIMIT 5;")
+    print("  SELECT * FROM docs WHERE chunk_index < 3;")
+    print("  .schema docs")
+    print()
+
+    # Open DuckDB with init commands using process substitution (no temp file)
+    view_path = f"{db_path}/{table}.lance"
+
+    # Build init commands as separate lines to avoid justfile parsing issues
+    commands = []
+    commands.append("INSTALL lance FROM community;")
+    commands.append("LOAD lance;")
+    commands.append(f"CREATE OR REPLACE VIEW docs AS SELECT * FROM __lance_scan('{view_path}');")
+    commands.append(".timer on")
+    commands.append("SELECT '🎯 Connected! Table \"docs\" has ' || COUNT(*)::VARCHAR || ' rows' as status FROM docs;")
+    init_script = "\n".join(commands)
+
+    # Build the bash command with heredoc
+    bash_cmd = f"duckdb -init <(cat <<'INITEOF'\n{init_script}\nINITEOF\n)"
+
+    subprocess.run(['bash', '-c', bash_cmd])
+
 # Demo: Ingest solid.md and search for "throw redirect" (uses markdown-h3 by default)
 demo-solid:
     @echo "📚 Ingesting solid.md with markdown h3 chunking..."
-    uv run lance-db-example ingest tests/data/solid.md
+    uv run lance-db-example ingest tests/data/solid.md --library solid-js
     @echo ""
     @echo "🔍 Searching for 'throw redirect'..."
     uv run lance-db-example search "throw redirect" --limit 3
