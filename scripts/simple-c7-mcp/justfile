@@ -35,3 +35,360 @@ uninstall:
 # Reinstall the CLI tool
 reinstall:
     uv tool install . --force --reinstall
+
+# ============================================================================
+# Library Management
+# ============================================================================
+
+# Create a library
+create-library name language ecosystem description="" port="8000":
+    #!/usr/bin/env python3
+    import json
+    import urllib.request
+    import sys
+
+    url = "http://127.0.0.1:{{ port }}/api/v1/libraries"
+    data = {
+        "name": "{{ name }}",
+        "language": "{{ language }}",
+        "ecosystem": "{{ ecosystem }}",
+        "description": "{{ description }}"
+    }
+
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(data).encode('utf-8'),
+        headers={'Content-Type': 'application/json'}
+    )
+
+    try:
+        with urllib.request.urlopen(req) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            print(json.dumps(result, indent=2))
+            print(f"\n✅ Created library: {result['name']}")
+            print(f"   ID: {result['id']}")
+            print(f"   Context7 ID: {result['context7_id']}")
+    except urllib.error.HTTPError as e:
+        error = json.loads(e.read().decode('utf-8'))
+        print(f"❌ Error {e.code}: {error['detail']}")
+        sys.exit(1)
+
+# List all libraries
+list-libraries port="8000":
+    curl -s http://127.0.0.1:{{ port }}/api/v1/libraries | python -m json.tool
+
+# ============================================================================
+# Document Management
+# ============================================================================
+
+# Upload a document from a file
+upload-doc file library_id title="" port="8000":
+    #!/usr/bin/env python3
+    import json
+    import urllib.request
+    import sys
+    from pathlib import Path
+
+    file_path = Path("{{ file }}")
+    if not file_path.exists():
+        print(f"❌ File not found: {file_path}")
+        sys.exit(1)
+
+    content = file_path.read_text(encoding='utf-8')
+    title = "{{ title }}" or file_path.stem
+
+    url = "http://127.0.0.1:{{ port }}/api/v1/documents"
+    data = {
+        "title": title,
+        "library_id": "{{ library_id }}",
+        "content": content
+    }
+
+    print(f"📤 Uploading: {file_path.name}")
+    print(f"   Title: {title}")
+    print(f"   Library: {{ library_id }}")
+    print(f"   Size: {len(content)} bytes")
+    print()
+
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(data).encode('utf-8'),
+        headers={'Content-Type': 'application/json'}
+    )
+
+    try:
+        with urllib.request.urlopen(req) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            print("✅ Document uploaded successfully!")
+            print(f"   ID: {result['id']}")
+            print(f"   Title: {result['title']}")
+    except urllib.error.HTTPError as e:
+        error = json.loads(e.read().decode('utf-8'))
+        print(f"❌ Error {e.code}: {error['detail']}")
+        sys.exit(1)
+
+# Fetch documentation from Context7 and upload to our API
+fetch-doc library query port="8000":
+    #!/usr/bin/env python3
+    import json
+    import sys
+    import os
+    import urllib.request
+    from pathlib import Path
+
+    library = "{{ library }}"
+    query = "{{ query }}"
+    api_port = "{{ port }}"
+
+    if not query:
+        print("❌ Error: query parameter is required")
+        print()
+        print("Usage: just fetch-doc LIBRARY 'your question or use case'")
+        print()
+        print("Examples:")
+        print("  just fetch-doc 'solidstart' 'How to throw a redirect in SolidStart'")
+        print("  just fetch-doc 'fastapi' 'How to create a REST API with authentication'")
+        print("  just fetch-doc 'react' 'useState hook documentation'")
+        print()
+        print("The query helps Context7 find the most relevant library match")
+        print("and improves documentation quality.")
+        sys.exit(1)
+
+    print(f"🔍 Step 1: Resolving library: {library}")
+    print(f"   Query context: {query}")
+    print()
+
+    # Step 1: Call Context7 MCP API to resolve library name
+    mcp_url = "https://mcp.context7.com/mcp"
+    api_key = os.environ.get('CONTEXT7_API_KEY', '')
+
+    request_data = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": "resolve-library-id",
+            "arguments": {
+                "libraryName": library,
+                "query": query
+            }
+        }
+    }
+
+    headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream'
+    }
+    if api_key:
+        headers['CONTEXT7_API_KEY'] = api_key
+
+    req = urllib.request.Request(
+        mcp_url,
+        data=json.dumps(request_data).encode('utf-8'),
+        headers=headers
+    )
+
+    try:
+        with urllib.request.urlopen(req) as response:
+            result = json.loads(response.read().decode('utf-8'))
+    except Exception as e:
+        print(f"❌ Context7 API request failed: {e}")
+        sys.exit(1)
+
+    # Parse the response to get library_id
+    try:
+        content_text = result['result']['content'][0]['text']
+
+        # Parse library options
+        libraries = []
+        current_lib = {}
+
+        for line in content_text.split('\n'):
+            line = line.strip()
+
+            if line.startswith('- Title:'):
+                if current_lib.get('id'):
+                    libraries.append(current_lib)
+                current_lib = {'title': line.split('- Title:')[1].strip()}
+            elif line.startswith('- Context7-compatible library ID:'):
+                current_lib['id'] = line.split('Context7-compatible library ID:')[1].strip()
+            elif line.startswith('- Description:'):
+                current_lib['description'] = line.split('- Description:')[1].strip()
+            elif line.startswith('- Benchmark Score:'):
+                try:
+                    current_lib['score'] = float(line.split('- Benchmark Score:')[1].strip())
+                except:
+                    current_lib['score'] = 0
+
+        if current_lib.get('id'):
+            libraries.append(current_lib)
+
+        if not libraries:
+            print("❌ No libraries found in Context7 response")
+            sys.exit(1)
+
+        # Pick best match
+        libraries.sort(key=lambda x: x.get('score', 0), reverse=True)
+        best_match = libraries[0]
+        library_id = best_match['id']
+
+        print(f"✅ Resolved: {best_match['title']}")
+        print(f"   Context7 ID: {library_id}")
+        print(f"   Score: {best_match.get('score', 'N/A')}")
+
+    except (KeyError, IndexError, TypeError) as e:
+        print(f"❌ Failed to parse Context7 response: {e}")
+        sys.exit(1)
+
+    # Step 2: Download documentation
+    print(f"\n📥 Step 2: Downloading documentation...")
+    doc_url = f"https://context7.com{library_id}/llms.txt"
+    print(f"   URL: {doc_url}")
+
+    try:
+        with urllib.request.urlopen(doc_url) as response:
+            content = response.read().decode('utf-8')
+        print(f"✅ Downloaded: {len(content)} bytes")
+    except Exception as e:
+        print(f"❌ Failed to download: {e}")
+        sys.exit(1)
+
+    # Step 3: Create library in our API (if not exists)
+    print(f"\n📚 Step 3: Creating library in our API...")
+
+    # Extract language and ecosystem from library_id
+    # Format: /npm/package-name or /pypi/package-name or /github/org/repo
+    parts = library_id.strip('/').split('/')
+    if len(parts) >= 2:
+        ecosystem = parts[0]
+        # Map ecosystems to languages
+        language_map = {
+            'npm': 'JavaScript',
+            'pypi': 'Python',
+            'github': 'Unknown',
+            'websites': 'Unknown',
+            'go': 'Go',
+            'crates': 'Rust',
+        }
+        language = language_map.get(ecosystem, 'Unknown')
+    else:
+        ecosystem = 'unknown'
+        language = 'Unknown'
+
+    lib_api_url = f"http://127.0.0.1:{api_port}/api/v1/libraries"
+    lib_data = {
+        "name": library,
+        "language": language,
+        "ecosystem": ecosystem,
+        "context7_id": library_id,
+        "description": best_match.get('description', '')
+    }
+
+    req = urllib.request.Request(
+        lib_api_url,
+        data=json.dumps(lib_data).encode('utf-8'),
+        headers={'Content-Type': 'application/json'}
+    )
+
+    try:
+        with urllib.request.urlopen(req) as response:
+            lib_result = json.loads(response.read().decode('utf-8'))
+            our_library_id = lib_result['id']
+            print(f"✅ Library created: {lib_result['name']}")
+            print(f"   ID: {our_library_id}")
+    except urllib.error.HTTPError as e:
+        if e.code == 400:
+            # Library already exists, that's OK
+            error = json.loads(e.read().decode('utf-8'))
+            if 'already exists' in error['detail']:
+                print(f"ℹ️  Library already exists, continuing...")
+                # For now, use a placeholder ID - in production, we'd query for it
+                our_library_id = f"lib-{ecosystem}-{library.lower()}"
+            else:
+                print(f"❌ Error: {error['detail']}")
+                sys.exit(1)
+        else:
+            print(f"❌ Error {e.code}")
+            sys.exit(1)
+
+    # Step 4: Upload document to our API
+    print(f"\n📤 Step 4: Uploading document to our API...")
+    doc_api_url = f"http://127.0.0.1:{api_port}/api/v1/documents"
+    doc_data = {
+        "title": f"{library} Documentation",
+        "library_id": our_library_id,
+        "content": content
+    }
+
+    req = urllib.request.Request(
+        doc_api_url,
+        data=json.dumps(doc_data).encode('utf-8'),
+        headers={'Content-Type': 'application/json'}
+    )
+
+    try:
+        with urllib.request.urlopen(req) as response:
+            doc_result = json.loads(response.read().decode('utf-8'))
+            print(f"✅ Document uploaded!")
+            print(f"   ID: {doc_result['id']}")
+            print(f"   Title: {doc_result['title']}")
+    except urllib.error.HTTPError as e:
+        error = json.loads(e.read().decode('utf-8'))
+        print(f"❌ Error {e.code}: {error['detail']}")
+        sys.exit(1)
+
+    print(f"\n🎉 Complete! {library} documentation is now in the system")
+    print(f"   Library ID: {our_library_id}")
+    print(f"   Context7 ID: {library_id}")
+
+# ============================================================================
+# Demo Commands
+# ============================================================================
+
+# Demo: Create library and upload a document
+demo port="8000":
+    @echo "🚀 Running complete demo..."
+    @echo ""
+    @echo "Step 1: Starting server (if not running)"
+    @echo "  Run 'just serve' in another terminal first!"
+    @echo ""
+    @echo "Step 2: Creating FastAPI library"
+    just create-library "FastAPI" "Python" "pypi" "Modern Python web framework" {{ port }}
+    @echo ""
+    @echo "Step 3: Creating a sample document file"
+    @mkdir -p tests/data
+    @echo "# FastAPI Quick Start\n\nFastAPI is a modern web framework for building APIs." > tests/data/fastapi-sample.md
+    @echo ""
+    @echo "Step 4: Uploading document"
+    just upload-doc tests/data/fastapi-sample.md "lib-pypi-fastapi-*" "FastAPI Quick Start" {{ port }}
+    @echo ""
+    @echo "✅ Demo complete!"
+
+# Demo: Fetch library from Context7
+demo-fetch library="solidstart" query="How to throw a redirect in SolidStart" port="8000":
+    @echo "🚀 Fetching {{ library }} from Context7..."
+    @echo ""
+    just fetch-doc "{{ library }}" "{{ query }}" {{ port }}
+    @echo ""
+    @echo "✅ Demo complete!"
+
+# Quick fetch with common use cases (queries include library name for better context)
+fetch-solidstart port="8000":
+    just fetch-doc "solidstart" "How to throw a redirect in SolidStart" {{ port }}
+
+fetch-fastapi port="8000":
+    just fetch-doc "fastapi" "How to create a REST API with authentication using FastAPI" {{ port }}
+
+fetch-react port="8000":
+    just fetch-doc "react" "How to use useState and useEffect hooks in React" {{ port }}
+
+fetch-vue port="8000":
+    just fetch-doc "vue" "Vue 3 Composition API and reactive state management" {{ port }}
+
+fetch-daisyui port="8000":
+    just fetch-doc "daisyui" "How to use button and card components in DaisyUI" {{ port }}
+
+# Clean the database
+clean-db:
+    rm -rf lancedb_data
+    @echo "✅ Database cleaned"

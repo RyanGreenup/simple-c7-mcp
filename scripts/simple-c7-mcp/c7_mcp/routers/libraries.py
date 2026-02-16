@@ -40,22 +40,59 @@ async def create_library(library: LibraryCreate) -> LibraryResponse:
     """Create a new library.
 
     Args:
-        library: Library creation data (name and optional description).
+        library: Library creation data with required fields:
+            - name: Library name
+            - language: Programming language
+            - ecosystem: Package ecosystem (npm, pypi, etc.)
+            And optional fields for description, URLs, metadata, etc.
 
     Returns:
-        Created library with metadata.
+        Created library with full metadata.
 
     Raises:
-        HTTPException: 400 if library name already exists.
-        HTTPException: 501 if not implemented yet.
+        HTTPException: 400 if library name already exists in ecosystem.
+        HTTPException: 500 if database error occurs.
 
-    TODO: Implement library creation endpoint.
-    TODO: 1. Call library_service.create_library()
-    TODO: 2. Transform LibraryData to LibraryResponse
-    TODO: 3. Handle duplicate name errors (400)
-    TODO: 4. Handle other errors (500)
+    Example:
+        >>> POST /api/v1/libraries
+        >>> {
+        >>>   "name": "FastAPI",
+        >>>   "language": "Python",
+        >>>   "ecosystem": "pypi",
+        >>>   "description": "Modern Python web framework",
+        >>>   "keywords": ["web", "framework", "async"]
+        >>> }
     """
-    raise HTTPException(status_code=501, detail="Not implemented")
+    try:
+        # Call service layer
+        library_data = library_service.create_library(
+            name=library.name,
+            language=library.language,
+            ecosystem=library.ecosystem,
+            description=library.description,
+            short_description=library.short_description,
+            context7_id=library.context7_id,
+            aliases=library.aliases,
+            keywords=library.keywords,
+            category=library.category,
+            homepage_url=library.homepage_url,
+            repository_url=library.repository_url,
+            logo_url=library.logo_url,
+            author=library.author,
+            license=library.license,
+        )
+
+        # Transform to response model
+        return LibraryResponse(**library_data)
+
+    except ValueError as e:
+        # Handle duplicate name or validation errors
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        # Handle unexpected errors
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create library: {str(e)}"
+        )
 
 
 @router.get("/{library_id}", response_model=LibraryResponse)

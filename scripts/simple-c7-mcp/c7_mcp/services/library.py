@@ -3,8 +3,11 @@
 This module provides business logic for library CRUD operations.
 """
 
+import uuid
 from datetime import datetime
 from typing import TypedDict
+
+from c7_mcp.db import get_libraries_table
 
 
 class LibraryData(TypedDict):
@@ -13,7 +16,20 @@ class LibraryData(TypedDict):
     Attributes:
         id: Library unique identifier.
         name: Library name.
-        description: Library description (optional).
+        context7_id: Context7 compatible path.
+        language: Primary programming language.
+        ecosystem: Package ecosystem.
+        description: Library description.
+        short_description: One-liner summary.
+        aliases: Alternative names.
+        keywords: Searchable terms.
+        category: Library type.
+        homepage_url: Official website.
+        repository_url: Source code URL.
+        author: Creator/maintainer.
+        license: License type.
+        status: Library status.
+        popularity_score: Popularity metric.
         created_at: Creation timestamp.
         updated_at: Last update timestamp.
         document_count: Number of documents in library.
@@ -21,7 +37,20 @@ class LibraryData(TypedDict):
 
     id: str
     name: str
-    description: str | None
+    context7_id: str
+    language: str
+    ecosystem: str
+    description: str
+    short_description: str
+    aliases: list[str]
+    keywords: list[str]
+    category: str
+    homepage_url: str
+    repository_url: str
+    author: str
+    license: str
+    status: str
+    popularity_score: int
     created_at: datetime
     updated_at: datetime
     document_count: int
@@ -43,28 +72,130 @@ def list_libraries() -> list[LibraryData]:
     return []
 
 
-def create_library(name: str, description: str | None = None) -> LibraryData:
+def create_library(
+    name: str,
+    language: str,
+    ecosystem: str,
+    description: str = "",
+    short_description: str = "",
+    context7_id: str | None = None,
+    aliases: list[str] | None = None,
+    keywords: list[str] | None = None,
+    category: str = "",
+    homepage_url: str = "",
+    repository_url: str = "",
+    logo_url: str = "",
+    author: str = "",
+    license: str = "",
+) -> LibraryData:
     """Create a new library.
 
     Args:
-        name: Library name.
-        description: Optional library description.
+        name: Library name (required).
+        language: Primary programming language (required).
+        ecosystem: Package ecosystem (required).
+        description: Full library description.
+        short_description: One-liner summary.
+        context7_id: Context7 path, auto-generated if not provided.
+        aliases: Alternative names.
+        keywords: Searchable terms.
+        category: Library type.
+        homepage_url: Official website.
+        repository_url: Source code URL.
+        logo_url: Library logo URL.
+        author: Creator/maintainer.
+        license: License type.
 
     Returns:
         Created library data.
 
-    TODO: Implement library creation logic.
-    TODO: 1. Validate name uniqueness
-    TODO: 2. Generate unique ID
-    TODO: 3. Store in database
-    TODO: 4. Initialize empty document collection
+    Raises:
+        ValueError: If library name already exists in the ecosystem.
     """
-    # Placeholder implementation
+    libraries = get_libraries_table()
     now = datetime.now()
-    return {
-        "id": "lib-placeholder",
+
+    # 1. Validate name uniqueness within ecosystem
+    existing = (
+        libraries.search()
+        .where(f"name = '{name}' AND ecosystem = '{ecosystem}'", prefilter=True)
+        .limit(1)
+        .to_list()
+    )
+
+    if existing:
+        raise ValueError(
+            f"Library '{name}' already exists in ecosystem '{ecosystem}'"
+        )
+
+    # 2. Generate unique ID
+    unique_suffix = str(uuid.uuid4())[:8]
+    lib_id = f"lib-{ecosystem}-{name.lower().replace(' ', '-')}-{unique_suffix}"
+
+    # 3. Auto-generate context7_id if not provided
+    if context7_id is None:
+        # Format: /{ecosystem}/{normalized-name}
+        normalized_name = name.lower().replace(" ", "-")
+        context7_id = f"/{ecosystem}/{normalized_name}"
+
+    # 4. Prepare library data
+    library_data = {
+        "id": lib_id,
         "name": name,
+        "context7_id": context7_id,
+        "language": language,
+        "ecosystem": ecosystem,
         "description": description,
+        "short_description": short_description,
+        "aliases": aliases or [],
+        "keywords": keywords or [],
+        "category": category,
+        "homepage_url": homepage_url,
+        "repository_url": repository_url,
+        "logo_url": logo_url,  # Added missing field
+        "author": author,
+        "license": license,
+        "status": "active",
+        "popularity_score": 0,
+        "github_stars": 0,
+        "npm_downloads_weekly": 0,
+        "pypi_downloads_monthly": 0,
+        "doc_version": "",
+        "doc_source_type": "",
+        "doc_completeness": 0.0,
+        "last_indexed_at": None,
+        "related_libraries": [],
+        "alternative_to": [],
+        "supersedes": [],
+        "requires_libraries": [],
+        "first_release_date": None,
+        "last_release_date": None,
+        "created_at": now,
+        "updated_at": now,
+        "document_count": 0,
+    }
+
+    # 5. Store in database
+    libraries.add([library_data])
+
+    # 6. Return LibraryData TypedDict
+    return {
+        "id": lib_id,
+        "name": name,
+        "context7_id": context7_id,
+        "language": language,
+        "ecosystem": ecosystem,
+        "description": description,
+        "short_description": short_description,
+        "aliases": aliases or [],
+        "keywords": keywords or [],
+        "category": category,
+        "homepage_url": homepage_url,
+        "repository_url": repository_url,
+        "author": author,
+        "license": license,
+        "status": "active",
+        "popularity_score": 0,
         "created_at": now,
         "updated_at": now,
         "document_count": 0,
@@ -93,7 +224,20 @@ def get_library(library_id: str) -> LibraryData:
     return {
         "id": library_id,
         "name": "Placeholder Library",
-        "description": None,
+        "context7_id": "/placeholder/library",
+        "language": "Unknown",
+        "ecosystem": "unknown",
+        "description": "",
+        "short_description": "",
+        "aliases": [],
+        "keywords": [],
+        "category": "",
+        "homepage_url": "",
+        "repository_url": "",
+        "author": "",
+        "license": "",
+        "status": "active",
+        "popularity_score": 0,
         "created_at": now,
         "updated_at": now,
         "document_count": 0,
@@ -101,7 +245,7 @@ def get_library(library_id: str) -> LibraryData:
 
 
 def update_library(
-    library_id: str, name: str, description: str | None = None
+    library_id: str, name: str, description: str = ""
 ) -> LibraryData:
     """Update library (full update).
 
@@ -127,7 +271,20 @@ def update_library(
     return {
         "id": library_id,
         "name": name,
+        "context7_id": "/placeholder/library",
+        "language": "Unknown",
+        "ecosystem": "unknown",
         "description": description,
+        "short_description": "",
+        "aliases": [],
+        "keywords": [],
+        "category": "",
+        "homepage_url": "",
+        "repository_url": "",
+        "author": "",
+        "license": "",
+        "status": "active",
+        "popularity_score": 0,
         "created_at": now,
         "updated_at": now,
         "document_count": 0,
@@ -161,7 +318,20 @@ def partial_update_library(
     return {
         "id": library_id,
         "name": name or "Placeholder Library",
-        "description": description,
+        "context7_id": "/placeholder/library",
+        "language": "Unknown",
+        "ecosystem": "unknown",
+        "description": description or "",
+        "short_description": "",
+        "aliases": [],
+        "keywords": [],
+        "category": "",
+        "homepage_url": "",
+        "repository_url": "",
+        "author": "",
+        "license": "",
+        "status": "active",
+        "popularity_score": 0,
         "created_at": now,
         "updated_at": now,
         "document_count": 0,
