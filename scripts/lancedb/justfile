@@ -89,6 +89,49 @@ clean-db:
     rm -rf lancedb_data
     @echo "✅ Database cleaned"
 
+# Delete documents by library name
+delete-library library db_path="./lancedb_data" table="documents":
+    #!/usr/bin/env python3
+    import sys
+    import lancedb
+    from pathlib import Path
+
+    library = "{{ library }}"
+    db_path = Path("{{ db_path }}")
+    table_name = "{{ table }}"
+
+    if not db_path.exists():
+        print(f"❌ Database not found at: {db_path}")
+        sys.exit(1)
+
+    print(f"🗑️  Deleting documents with library='{library}'...")
+
+    try:
+        db = lancedb.connect(db_path)
+        table = db.open_table(table_name)
+
+        # Count before
+        import pyarrow.compute as pc
+        before = len(table.to_pandas())
+        to_delete = len(table.to_pandas()[table.to_pandas()['library'] == library])
+
+        if to_delete == 0:
+            print(f"⚠️  No documents found with library='{library}'")
+            sys.exit(0)
+
+        # Delete using LanceDB API
+        table.delete(f"library = '{library}'")
+
+        # Compact to reclaim space
+        table.compact_files()
+
+        print(f"✅ Deleted {to_delete} documents")
+        print(f"   Before: {before} docs, After: {before - to_delete} docs")
+
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        sys.exit(1)
+
 # Show CLI help
 help:
     uv run lance-db-example --help
