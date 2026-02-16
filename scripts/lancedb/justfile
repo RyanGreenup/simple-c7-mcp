@@ -92,3 +92,23 @@ clean-db:
 # Show CLI help
 help:
     uv run lance-db-example --help
+
+# Demo: Ingest solid.md and search for "throw redirect" (uses markdown-h3 by default)
+demo-solid:
+    @echo "📚 Ingesting solid.md with markdown h3 chunking..."
+    uv run lance-db-example ingest tests/data/solid.md
+    @echo ""
+    @echo "🔍 Searching for 'throw redirect'..."
+    uv run lance-db-example search "throw redirect" --limit 3
+    @echo ""
+    @echo "✅ Demo complete! Check the chunking above."
+
+# Demo: Ingest with character-based chunking (old behavior)
+demo-solid-char:
+    @echo "📚 Ingesting solid.md with character-based chunking..."
+    uv run lance-db-example ingest tests/data/solid.md --chunking-strategy character --chunk-size 1000
+    @echo ""
+    @echo "🔍 Searching for 'throw redirect'..."
+    uv run lance-db-example search "throw redirect" --limit 3
+    @echo ""
+    @echo "✅ Demo complete!"

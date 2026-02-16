@@ -15,7 +15,14 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 
-from lance_db_example.chunking import chunk_text, get_chunk_stats
+from lance_db_example.chunking import (
+    chunk_text,
+    get_chunk_stats,
+    chunk_markdown_by_level3_headers,
+    chunk_by_markdown_headers,
+    chunk_by_paragraphs,
+    chunk_by_sentences,
+)
 
 try:
     from sentence_transformers import SentenceTransformer
@@ -150,17 +157,23 @@ def ingest(
         "-t",
         help="Name of the table to create/update"
     ),
+    chunking_strategy: str = typer.Option(
+        "markdown-h3",
+        "--chunking-strategy",
+        "-s",
+        help="Chunking strategy: 'markdown-h3', 'markdown', 'character', 'paragraph', 'sentence'"
+    ),
     chunk_size: int = typer.Option(
         500,
         "--chunk-size",
         "-c",
-        help="Size of text chunks in characters"
+        help="Size of text chunks in characters (used with 'character' strategy)"
     ),
     overlap: int = typer.Option(
         50,
         "--overlap",
         "-o",
-        help="Overlap between chunks in characters"
+        help="Overlap between chunks in characters (used with 'character' strategy)"
     ),
     model: str = typer.Option(
         "all-MiniLM-L6-v2",
@@ -174,9 +187,14 @@ def ingest(
     This command reads a text file, splits it into chunks, generates
     embeddings, and stores them in a LanceDB table.
 
+    The default chunking strategy is 'markdown-h3', which splits markdown
+    files by level 3 headers (###). This is ideal for API docs, code examples,
+    and structured markdown content.
+
     Example:
-        lance-db-example ingest document.txt
-        lance-db-example ingest document.txt --db ./my_db --table my_docs
+        lance-db-example ingest document.md  # Uses markdown-h3 by default
+        lance-db-example ingest document.txt --chunking-strategy character
+        lance-db-example ingest document.md --db ./my_db --table my_docs
     """
     console.print(f"\n[bold cyan]📄 Ingesting file: {file_path}[/bold cyan]")
 
@@ -190,9 +208,45 @@ def ingest(
 
     console.print(f"[dim]File size: {len(text)} characters[/dim]")
 
-    # Chunk the text
-    console.print(f"[yellow]✂️  Chunking text (chunk_size={chunk_size}, overlap={overlap})...[/yellow]")
-    chunks = chunk_text(text, chunk_size=chunk_size, overlap=overlap)
+    # Chunk the text based on strategy
+    console.print(f"[yellow]✂️  Chunking text (strategy: {chunking_strategy})...[/yellow]")
+
+    if chunking_strategy == "markdown-h3":
+        try:
+            chunks = chunk_markdown_by_level3_headers(text)
+            console.print(f"[dim]Using markdown level 3 header (###) splitting[/dim]")
+        except ImportError as e:
+            console.print(f"[yellow]⚠️  {e}[/yellow]")
+            console.print(f"[yellow]Falling back to character-based chunking...[/yellow]")
+            chunks = chunk_text(text, chunk_size=chunk_size, overlap=overlap)
+
+    elif chunking_strategy == "markdown":
+        try:
+            chunk_dicts = chunk_by_markdown_headers(text, return_metadata=False)
+            chunks = chunk_dicts if isinstance(chunk_dicts[0], str) else [c['content'] for c in chunk_dicts]
+            console.print(f"[dim]Using markdown header (h1/h2/h3) splitting[/dim]")
+        except ImportError as e:
+            console.print(f"[yellow]⚠️  {e}[/yellow]")
+            console.print(f"[yellow]Falling back to character-based chunking...[/yellow]")
+            chunks = chunk_text(text, chunk_size=chunk_size, overlap=overlap)
+
+    elif chunking_strategy == "paragraph":
+        chunks = chunk_by_paragraphs(text, max_paragraphs=2)
+        console.print(f"[dim]Using paragraph-based splitting[/dim]")
+
+    elif chunking_strategy == "sentence":
+        chunks = chunk_by_sentences(text, max_sentences=3, overlap_sentences=1)
+        console.print(f"[dim]Using sentence-based splitting[/dim]")
+
+    elif chunking_strategy == "character":
+        chunks = chunk_text(text, chunk_size=chunk_size, overlap=overlap)
+        console.print(f"[dim]Using character-based splitting (size={chunk_size}, overlap={overlap})[/dim]")
+
+    else:
+        console.print(f"[bold red]❌ Error: Unknown chunking strategy: {chunking_strategy}[/bold red]")
+        console.print(f"[yellow]Available strategies: markdown-h3, markdown, character, paragraph, sentence[/yellow]")
+        raise typer.Exit(1)
+
     console.print(f"[green]✓ Created {len(chunks)} chunks[/green]")
 
     # Generate embeddings

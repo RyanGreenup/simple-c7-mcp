@@ -158,20 +158,39 @@ lance_db_example/
 
 The `chunking.py` module provides multiple chunking strategies:
 
-- **`chunk_text()`** - Character-based chunking with sentence boundaries (default)
+#### For Markdown Documents (Recommended for API Docs)
+- **`chunk_by_markdown_headers()`** - Split by markdown headers (LangChain)
+- **`chunk_markdown_by_level3_headers()`** - Split by ### headers specifically
+
+#### For Plain Text
+- **`chunk_text()`** - Character-based chunking with sentence boundaries
 - **`chunk_by_sentences()`** - Sentence-based chunking
 - **`chunk_by_paragraphs()`** - Paragraph-based chunking
 - **`chunk_by_tokens()`** - Token-based chunking for transformers
+
+#### Utilities
 - **`get_chunk_stats()`** - Get statistics about chunks
 
 Example usage:
 ```python
-from lance_db_example.chunking import chunk_text, get_chunk_stats
+from lance_db_example.chunking import (
+    chunk_markdown_by_level3_headers,
+    chunk_text,
+    get_chunk_stats
+)
 
-chunks = chunk_text(text, chunk_size=500, overlap=50)
+# For markdown documentation with ### headers
+markdown_chunks = chunk_markdown_by_level3_headers(markdown_text)
+
+# For plain text
+text_chunks = chunk_text(text, chunk_size=500, overlap=50)
+
+# Get statistics
 stats = get_chunk_stats(chunks)
 print(f"Created {stats['count']} chunks, avg length: {stats['avg_length']:.1f}")
 ```
+
+See `MARKDOWN_CHUNKING.md` for detailed markdown chunking documentation.
 
 ## Advanced Usage
 
