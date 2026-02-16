@@ -54,8 +54,16 @@ def get_device() -> str:
     return _device
 
 
-def get_model(model_name: str = "all-MiniLM-L6-v2"):
+def get_model(model_name: str = "Qwen/Qwen3-Embedding-4B"):
     """Get or create the sentence transformer model.
+
+    Default model: Qwen/Qwen3-Embedding-4B
+    - VRAM Requirements: ~8GB for optimal performance
+    - Recommended: RTX 3060 (12GB) or better
+    - For lower VRAM: Use "all-MiniLM-L6-v2" (~2GB) via --model flag
+    - Embedding dimension: 2560 (vs 384 for MiniLM, 4096 for 8B)
+    - MTEB Score: ~68.5 (balanced quality/performance)
+    - For highest quality: Use "Qwen/Qwen3-Embedding-8B" (~16GB VRAM, MTEB 70.58)
 
     Args:
         model_name: Name of the sentence-transformers model
@@ -67,14 +75,14 @@ def get_model(model_name: str = "all-MiniLM-L6-v2"):
     if _model is None:
         device = get_device()
         console.print(f"[dim]Loading model '{model_name}' on {device}...[/dim]")
-        _model = SentenceTransformer(model_name, device=device)
+        _model = SentenceTransformer(model_name, device=device, trust_remote_code=True)
     return _model
 
 
 def create_embeddings(
     texts: list[str],
     use_transformer: bool = True,
-    model_name: str = "all-MiniLM-L6-v2"
+    model_name: str = "Qwen/Qwen3-Embedding-4B"
 ) -> list[list[float]]:
     """Create embeddings using sentence-transformers or fallback to simple method.
 
@@ -176,10 +184,10 @@ def ingest(
         help="Overlap between chunks in characters (used with 'character' strategy)"
     ),
     model: str = typer.Option(
-        "all-MiniLM-L6-v2",
+        "Qwen/Qwen3-Embedding-4B",
         "--model",
         "-m",
-        help="Sentence transformer model name (use 'simple' for fallback)"
+        help="Embedding model (default: Qwen3-4B, ~8GB VRAM. Use 'all-MiniLM-L6-v2' for low VRAM or 'simple' for CPU-only fallback)"
     ),
     library: Optional[str] = typer.Option(
         None,
@@ -336,10 +344,10 @@ def search(
         help="Maximum number of results to return"
     ),
     model: str = typer.Option(
-        "all-MiniLM-L6-v2",
+        "Qwen/Qwen3-Embedding-4B",
         "--model",
         "-m",
-        help="Sentence transformer model name (use 'simple' for fallback)"
+        help="Embedding model (default: Qwen3-4B, ~8GB VRAM. Use 'all-MiniLM-L6-v2' for low VRAM or 'simple' for CPU-only fallback)"
     ),
 ):
     """Search for similar documents using vector similarity.
