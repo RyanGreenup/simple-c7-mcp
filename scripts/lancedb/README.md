@@ -150,7 +150,27 @@ embedding_func = openai.create(name="text-embedding-3-small")
 lance_db_example/
 ├── __init__.py
 ├── cli.py          # CLI entry point
-└── ingest.py       # Main logic (ingest, search, stats)
+├── ingest.py       # Main logic (ingest, search, stats, embeddings)
+└── chunking.py     # Text chunking utilities
+```
+
+### Chunking Module
+
+The `chunking.py` module provides multiple chunking strategies:
+
+- **`chunk_text()`** - Character-based chunking with sentence boundaries (default)
+- **`chunk_by_sentences()`** - Sentence-based chunking
+- **`chunk_by_paragraphs()`** - Paragraph-based chunking
+- **`chunk_by_tokens()`** - Token-based chunking for transformers
+- **`get_chunk_stats()`** - Get statistics about chunks
+
+Example usage:
+```python
+from lance_db_example.chunking import chunk_text, get_chunk_stats
+
+chunks = chunk_text(text, chunk_size=500, overlap=50)
+stats = get_chunk_stats(chunks)
+print(f"Created {stats['count']} chunks, avg length: {stats['avg_length']:.1f}")
 ```
 
 ## Advanced Usage

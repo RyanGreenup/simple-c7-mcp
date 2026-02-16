@@ -15,6 +15,8 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 
+from lance_db_example.chunking import chunk_text, get_chunk_stats
+
 try:
     from sentence_transformers import SentenceTransformer
     HAS_SENTENCE_TRANSFORMERS = True
@@ -60,62 +62,6 @@ def get_model(model_name: str = "all-MiniLM-L6-v2"):
         console.print(f"[dim]Loading model '{model_name}' on {device}...[/dim]")
         _model = SentenceTransformer(model_name, device=device)
     return _model
-
-
-def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> list[str]:
-    """Split text into overlapping chunks.
-
-    Args:
-        text: The text to split
-        chunk_size: Maximum size of each chunk in characters
-        overlap: Number of characters to overlap between chunks
-
-    Returns:
-        List of text chunks
-    """
-    if not text:
-        return []
-
-    chunks = []
-    start = 0
-    text_len = len(text)
-
-    while start < text_len:
-        end = min(start + chunk_size, text_len)
-        chunk = text[start:end]
-
-        # Try to break at sentence boundary if possible (only if not at end)
-        if end < text_len and len(chunk) > 100:
-            # Look for sentence endings in the last part of the chunk
-            search_start = max(0, len(chunk) - 100)
-            search_chunk = chunk[search_start:]
-
-            for delimiter in ['. ', '! ', '? ', '\n\n']:
-                last_delim = search_chunk.rfind(delimiter)
-                if last_delim != -1:
-                    # Adjust end position
-                    actual_delim_pos = search_start + last_delim + len(delimiter)
-                    end = start + actual_delim_pos
-                    chunk = text[start:end]
-                    break
-
-        chunk = chunk.strip()
-        if chunk:  # Only add non-empty chunks
-            chunks.append(chunk)
-
-        # Move start position forward
-        # Ensure we make progress to avoid infinite loop
-        next_start = max(end - overlap, start + 1)
-        if next_start <= start:
-            start = end
-        else:
-            start = next_start
-
-        # Safety check: if we're not making progress, break
-        if start >= text_len:
-            break
-
-    return chunks
 
 
 def create_embeddings(
