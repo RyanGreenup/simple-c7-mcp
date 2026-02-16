@@ -16,7 +16,13 @@ format:
 test:
     uv run pytest -v .
 
+# Start the FastAPI server
+serve port="8000":
+    uv run c7-mcp serve --port {{ port }} --reload
 
+# Check the health endpoint
+health port="8000":
+    curl -s http://127.0.0.1:{{ port }}/health | python -m json.tool
 
 # Install the CLI tool globally
 install:
