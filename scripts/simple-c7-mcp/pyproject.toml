@@ -5,13 +5,13 @@ build-backend = "hatchling.build"
 [project]
 name = "c7-mcp"
 version = "0.1.0"
-description = "Add your description here"
+description = "Context7 MCP Server"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.0",
+    "granian[reload]>=1.0.0",
     "typer>=0.20.0",
-    "uvicorn>=0.32.0",
 ]
 
 [project.scripts]

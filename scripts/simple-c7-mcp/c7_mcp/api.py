@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI
 
-app = FastAPI(title="C7 MCP API", version="0.1.0")
+app = FastAPI(title="Context7 MCP API", version="0.1.0")
 
 
 @app.get("/health")
