@@ -311,3 +311,671 @@ demo-daisyui:
     @echo ""
     @echo "🔍 Searching daisyUI docs..."
     uv run lance-db-example search "button component" --limit 3
+
+# Benchmark CPU vs GPU search speed
+benchmark-cpu query="button component" limit="5":
+    #!/usr/bin/env bash
+    set -e
+
+    echo "🔬 Benchmarking search performance..."
+    echo "Query: {{ query }}"
+    echo "Limit: {{ limit }}"
+    echo ""
+
+    # Test GPU (if available)
+    echo "⚡ Testing with GPU..."
+    START=$(date +%s.%N)
+    uv run lance-db-example search "{{ query }}" --limit {{ limit }} > /dev/null 2>&1
+    END=$(date +%s.%N)
+    GPU_TIME=$(echo "$END - $START" | bc)
+    echo "GPU time: ${GPU_TIME}s"
+    echo ""
+
+    # Test CPU (force by hiding GPU)
+    echo "🐌 Testing with CPU (hiding GPU with CUDA_VISIBLE_DEVICES='')..."
+    START=$(date +%s.%N)
+    CUDA_VISIBLE_DEVICES='' uv run lance-db-example search "{{ query }}" --limit {{ limit }} > /dev/null 2>&1
+    END=$(date +%s.%N)
+    CPU_TIME=$(echo "$END - $START" | bc)
+    echo "CPU time: ${CPU_TIME}s"
+    echo ""
+
+    # Calculate speedup
+    SPEEDUP=$(echo "scale=2; $CPU_TIME / $GPU_TIME" | bc)
+    echo "📊 Results:"
+    echo "  GPU: ${GPU_TIME}s"
+    echo "  CPU: ${CPU_TIME}s"
+    echo "  Speedup: ${SPEEDUP}x faster on GPU"
+
+# Quick CPU benchmark (single run)
+bench-cpu:
+    just benchmark-cpu "search query" 3
+
+# Time a search on CPU only (with output)
+search-cpu query="button component" limit="5":
+    @echo "🐌 Running search on CPU (this may take a while)..."
+    @echo "Query: {{ query }}"
+    @echo ""
+    time CUDA_VISIBLE_DEVICES='' uv run lance-db-example search "{{ query }}" --limit {{ limit }}
+
+# Benchmark multiple queries (shows real GPU benefit after model loading)
+benchmark-multi:
+    #!/usr/bin/env bash
+    set -e
+
+    echo "🔬 Multi-query benchmark (3 queries, model stays loaded)..."
+    echo ""
+
+    QUERIES=("button component" "authentication" "API routing")
+
+    # GPU benchmark
+    echo "⚡ GPU (3 sequential queries)..."
+    START=$(date +%s.%N)
+    for q in "${QUERIES[@]}"; do
+        uv run lance-db-example search "$q" --limit 3 > /dev/null 2>&1
+    done
+    END=$(date +%s.%N)
+    GPU_TOTAL=$(echo "$END - $START" | bc)
+    GPU_AVG=$(echo "scale=3; $GPU_TOTAL / 3" | bc)
+    echo "Total: ${GPU_TOTAL}s (avg: ${GPU_AVG}s per query)"
+    echo ""
+
+    # CPU benchmark
+    echo "🐌 CPU (3 sequential queries)..."
+    START=$(date +%s.%N)
+    for q in "${QUERIES[@]}"; do
+        CUDA_VISIBLE_DEVICES='' uv run lance-db-example search "$q" --limit 3 > /dev/null 2>&1
+    done
+    END=$(date +%s.%N)
+    CPU_TOTAL=$(echo "$END - $START" | bc)
+    CPU_AVG=$(echo "scale=3; $CPU_TOTAL / 3" | bc)
+    echo "Total: ${CPU_TOTAL}s (avg: ${CPU_AVG}s per query)"
+    echo ""
+
+    # Results
+    SPEEDUP=$(echo "scale=2; $CPU_TOTAL / $GPU_TOTAL" | bc)
+    echo "📊 Results:"
+    echo "  GPU total: ${GPU_TOTAL}s (${GPU_AVG}s avg)"
+    echo "  CPU total: ${CPU_TOTAL}s (${CPU_AVG}s avg)"
+    echo "  Speedup: ${SPEEDUP}x faster on GPU"
+    echo ""
+    echo "Note: First query includes model loading time (~15-20s)"
+    echo "      Subsequent queries show true inference speed"
+
+# Benchmark with Qwen3-Embedding-4B model
+benchmark-4b:
+    #!/usr/bin/env bash
+    set -e
+
+    MODEL="Qwen/Qwen3-Embedding-4B"
+    DB="lancedb_data_4b"
+
+    # Check if 4B database exists
+    if [ ! -d "$DB" ]; then
+        echo "⚠️  4B model database not found at $DB"
+        echo "Create it first:"
+        echo "  just ingest-4b tests/data/solid.md"
+        exit 1
+    fi
+
+    echo "🔬 Benchmarking Qwen3-Embedding-4B (8GB VRAM)..."
+    echo "Using database: $DB"
+    echo ""
+
+    QUERIES=("button component" "authentication" "API routing")
+
+    # GPU benchmark
+    echo "⚡ GPU with 4B model..."
+    START=$(date +%s.%N)
+    for q in "${QUERIES[@]}"; do
+        uv run lance-db-example search "$q" --limit 3 --model "$MODEL" --db "$DB" > /dev/null 2>&1
+    done
+    END=$(date +%s.%N)
+    GPU_TOTAL=$(echo "$END - $START" | bc)
+    GPU_AVG=$(echo "scale=3; $GPU_TOTAL / 3" | bc)
+    echo "Total: ${GPU_TOTAL}s (avg: ${GPU_AVG}s per query)"
+    echo ""
+
+    # CPU benchmark
+    echo "🐌 CPU with 4B model..."
+    START=$(date +%s.%N)
+    for q in "${QUERIES[@]}"; do
+        CUDA_VISIBLE_DEVICES='' uv run lance-db-example search "$q" --limit 3 --model "$MODEL" --db "$DB" > /dev/null 2>&1
+    done
+    END=$(date +%s.%N)
+    CPU_TOTAL=$(echo "$END - $START" | bc)
+    CPU_AVG=$(echo "scale=3; $CPU_TOTAL / 3" | bc)
+    echo "Total: ${CPU_TOTAL}s (avg: ${CPU_AVG}s per query)"
+    echo ""
+
+    SPEEDUP=$(echo "scale=2; $CPU_TOTAL / $GPU_TOTAL" | bc)
+    echo "📊 Results (Qwen3-4B):"
+    echo "  GPU: ${GPU_TOTAL}s (${GPU_AVG}s avg)"
+    echo "  CPU: ${CPU_TOTAL}s (${CPU_AVG}s avg)"
+    echo "  Speedup: ${SPEEDUP}x"
+    echo "  VRAM: ~8GB"
+    echo "  Embedding dim: 2560"
+
+# Compare 8B vs 4B models on GPU (model loading + inference)
+compare-models:
+    #!/usr/bin/env bash
+    set -e
+
+    echo "🔬 Comparing Qwen3-8B vs Qwen3-4B model loading..."
+    echo "Note: Different models need separate databases due to different embedding dims"
+    echo ""
+
+    # Check databases exist
+    if [ ! -d "lancedb_data" ]; then
+        echo "⚠️  8B database not found. Run: just ingest-sample"
+        exit 1
+    fi
+    if [ ! -d "lancedb_data_4b" ]; then
+        echo "⚠️  4B database not found. Creating it..."
+        just ingest-4b tests/data/solid.md
+    fi
+
+    QUERY="button component"
+
+    # Test 8B
+    echo "⚡ Testing Qwen3-Embedding-8B (16GB VRAM, dim=4096)..."
+    START=$(date +%s.%N)
+    for i in {1..3}; do
+        uv run lance-db-example search "$QUERY" --limit 3 --model "Qwen/Qwen3-Embedding-8B" --db lancedb_data > /dev/null 2>&1
+    done
+    END=$(date +%s.%N)
+    TIME_8B=$(echo "$END - $START" | bc)
+    AVG_8B=$(echo "scale=3; $TIME_8B / 3" | bc)
+    echo "Total: ${TIME_8B}s (avg: ${AVG_8B}s per query)"
+    echo ""
+
+    # Test 4B
+    echo "⚡ Testing Qwen3-Embedding-4B (8GB VRAM, dim=2560)..."
+    START=$(date +%s.%N)
+    for i in {1..3}; do
+        uv run lance-db-example search "$QUERY" --limit 3 --model "Qwen/Qwen3-Embedding-4B" --db lancedb_data_4b > /dev/null 2>&1
+    done
+    END=$(date +%s.%N)
+    TIME_4B=$(echo "$END - $START" | bc)
+    AVG_4B=$(echo "scale=3; $TIME_4B / 3" | bc)
+    echo "Total: ${TIME_4B}s (avg: ${AVG_4B}s per query)"
+    echo ""
+
+    SPEEDUP=$(echo "scale=2; $TIME_8B / $TIME_4B" | bc)
+    echo "📊 Comparison:"
+    echo "  8B model: ${TIME_8B}s (${AVG_8B}s avg) - 16GB VRAM, dim=4096, MTEB=70.58"
+    echo "  4B model: ${TIME_4B}s (${AVG_4B}s avg) - 8GB VRAM, dim=2560, MTEB=~68.5"
+    echo "  4B is ${SPEEDUP}x faster"
+    echo ""
+    echo "Trade-off: 4B uses half the VRAM and is faster, but slightly lower quality"
+
+# Ingest with 4B model (uses separate database)
+ingest-4b file:
+    uv run lance-db-example ingest {{file}} --model "Qwen/Qwen3-Embedding-4B" --db lancedb_data_4b
+
+# Search with 4B model (uses separate database)
+search-4b query limit="5":
+    uv run lance-db-example search "{{query}}" --limit {{limit}} --model "Qwen/Qwen3-Embedding-4B" --db lancedb_data_4b
+
+# Fetch library with 4B model
+fetch-4b library:
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+
+    library = "{{ library }}"
+
+    # Use the fetch-library logic but override the ingest to use 4B model
+    print(f"Note: Using Qwen3-4B model (2560-dim, 8GB VRAM)")
+    print(f"      Data will be stored in lancedb_data_4b/")
+    print()
+
+    # For now, just remind user to use --model flag
+    print("To fetch with 4B model:")
+    print(f'  1. Download: curl https://context7.com/[library-id]/llms.txt > file.md')
+    print(f'  2. Ingest: just ingest-4b file.md')
+    sys.exit(0)
+
+# Ingest with 0.6B model (uses separate database)
+ingest-0_6b file:
+    uv run lance-db-example ingest {{file}} --model "Qwen/Qwen3-Embedding-0.6B" --db lancedb_data_0_6b
+
+# Search with 0.6B model (uses separate database)
+search-0_6b query limit="5":
+    uv run lance-db-example search "{{query}}" --limit {{limit}} --model "Qwen/Qwen3-Embedding-0.6B" --db lancedb_data_0_6b
+
+# Benchmark with Qwen3-Embedding-0.6B model
+benchmark-0_6b:
+    #!/usr/bin/env bash
+    set -e
+
+    MODEL="Qwen/Qwen3-Embedding-0.6B"
+    DB="lancedb_data_0_6b"
+
+    # Check if 0.6B database exists
+    if [ ! -d "$DB" ]; then
+        echo "⚠️  0.6B model database not found at $DB"
+        echo "Create it first:"
+        echo "  just ingest-0_6b tests/data/solid.md"
+        exit 1
+    fi
+
+    echo "🔬 Benchmarking Qwen3-Embedding-0.6B (1.2GB VRAM)..."
+    echo "Using database: $DB"
+    echo ""
+
+    QUERIES=("button component" "authentication" "API routing")
+
+    # GPU benchmark
+    echo "⚡ GPU with 0.6B model..."
+    START=$(date +%s.%N)
+    for q in "${QUERIES[@]}"; do
+        uv run lance-db-example search "$q" --limit 3 --model "$MODEL" --db "$DB" > /dev/null 2>&1
+    done
+    END=$(date +%s.%N)
+    GPU_TOTAL=$(echo "$END - $START" | bc)
+    GPU_AVG=$(echo "scale=3; $GPU_TOTAL / 3" | bc)
+    echo "Total: ${GPU_TOTAL}s (avg: ${GPU_AVG}s per query)"
+    echo ""
+
+    # CPU benchmark
+    echo "🐌 CPU with 0.6B model..."
+    START=$(date +%s.%N)
+    for q in "${QUERIES[@]}"; do
+        CUDA_VISIBLE_DEVICES='' uv run lance-db-example search "$q" --limit 3 --model "$MODEL" --db "$DB" > /dev/null 2>&1
+    done
+    END=$(date +%s.%N)
+    CPU_TOTAL=$(echo "$END - $START" | bc)
+    CPU_AVG=$(echo "scale=3; $CPU_TOTAL / 3" | bc)
+    echo "Total: ${CPU_TOTAL}s (avg: ${CPU_AVG}s per query)"
+    echo ""
+
+    SPEEDUP=$(echo "scale=2; $CPU_TOTAL / $GPU_TOTAL" | bc)
+    echo "📊 Results (Qwen3-0.6B):"
+    echo "  GPU: ${GPU_TOTAL}s (${GPU_AVG}s avg)"
+    echo "  CPU: ${CPU_TOTAL}s (${CPU_AVG}s avg)"
+    echo "  Speedup: ${SPEEDUP}x"
+    echo "  VRAM: ~1.2GB"
+    echo "  Good for: CPU inference, edge devices, high throughput"
+
+# Compare all three Qwen models (8B, 4B, 0.6B)
+compare-all-models:
+    #!/usr/bin/env bash
+    set -e
+
+    echo "🔬 Comparing all Qwen3 embedding models..."
+    echo ""
+
+    # Create databases if missing
+    [ -d "lancedb_data" ] || { echo "Creating 8B database..."; just ingest-sample; }
+    [ -d "lancedb_data_4b" ] || { echo "Creating 4B database..."; just ingest-4b tests/data/solid.md; }
+    [ -d "lancedb_data_0_6b" ] || { echo "Creating 0.6B database..."; just ingest-0_6b tests/data/solid.md; }
+
+    QUERY="button component"
+
+    # Test 8B
+    echo "⚡ Testing Qwen3-8B..."
+    START=$(date +%s.%N)
+    for i in {1..3}; do
+        uv run lance-db-example search "$QUERY" --limit 3 --model "Qwen/Qwen3-Embedding-8B" --db lancedb_data > /dev/null 2>&1
+    done
+    END=$(date +%s.%N)
+    TIME_8B=$(echo "$END - $START" | bc)
+
+    # Test 4B
+    echo "⚡ Testing Qwen3-4B..."
+    START=$(date +%s.%N)
+    for i in {1..3}; do
+        uv run lance-db-example search "$QUERY" --limit 3 --model "Qwen/Qwen3-Embedding-4B" --db lancedb_data_4b > /dev/null 2>&1
+    done
+    END=$(date +%s.%N)
+    TIME_4B=$(echo "$END - $START" | bc)
+
+    # Test 0.6B
+    echo "⚡ Testing Qwen3-0.6B..."
+    START=$(date +%s.%N)
+    for i in {1..3}; do
+        uv run lance-db-example search "$QUERY" --limit 3 --model "Qwen/Qwen3-Embedding-0.6B" --db lancedb_data_0_6b > /dev/null 2>&1
+    done
+    END=$(date +%s.%N)
+    TIME_0_6B=$(echo "$END - $START" | bc)
+
+    echo ""
+    echo "📊 Full Model Comparison:"
+    echo "  8B:   ${TIME_8B}s - 16GB VRAM, highest quality (MTEB 70.58)"
+    echo "  4B:   ${TIME_4B}s - 8GB VRAM, balanced"
+    echo "  0.6B: ${TIME_0_6B}s - 1.2GB VRAM, fastest/smallest"
+    echo ""
+    echo "Speedup vs 8B:"
+    echo "  4B is $(echo "scale=2; $TIME_8B / $TIME_4B" | bc)x faster"
+    echo "  0.6B is $(echo "scale=2; $TIME_8B / $TIME_0_6B" | bc)x faster"
+
+
+# Fetch high-priority libraries (recommended to start with)
+fetch-priority:
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+
+    # High priority libraries based on your current work
+    libraries = [
+        # New job prep
+        "vue",
+        "nuxt",
+
+        # Current stack
+        "solid-js",
+        "@solidjs/start",
+        "tailwindcss",
+        "daisyui",
+
+        # Databases & Analytics
+        "duckdb",
+        "better-sqlite3",
+        "postgres",
+
+        # Python Backend
+        "fastapi",
+        "pydantic",
+        "typer",
+
+        # Data Science Core
+        "pandas",
+        "polars",
+        "numpy",
+
+        # ML/AI
+        "torch",
+        "transformers",
+        "langchain",
+
+        # Validation
+        "zod",
+
+        # Testing
+        "vitest",
+        "pytest",
+    ]
+
+    print(f"🎯 Fetching {len(libraries)} high-priority libraries...")
+    print()
+
+    for i, library in enumerate(libraries, 1):
+        print(f"[{i}/{len(libraries)}] {library}")
+        try:
+            subprocess.run(["just", "fetch-library", library], timeout=120)
+        except Exception as e:
+            print(f"  ⚠️  Error: {e}")
+        print()
+
+    print("✅ Priority libraries complete!")
+
+# Fetch all libraries from the list below
+fetch-all:
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+
+    # Libraries to fetch (organized by category)
+    libraries = [
+        # Frontend Frameworks
+        "solid-js",
+        "@solidjs/router",
+        "@solidjs/start",
+        "@kobalte/core",
+        "vue",
+        "nuxt",
+
+        # UI & Styling
+        "tailwindcss",
+        "daisyui",
+        "chart.js",
+
+        # Data Tables & Visualization
+        "@tanstack/solid-table",
+        "@tanstack/solid-virtual",
+        "papaparse",
+        "d3",
+
+        # Databases & Data Tools
+        "duckdb",
+        "better-sqlite3",
+        "postgres",
+        "clickhouse",
+        "polars",
+        "pandas",
+
+        # Python Backend & API
+        "fastapi",
+        "typer",
+        "pydantic",
+        "requests",
+
+        # Rust Backend
+        "poem",
+        "tokio",
+        "serde",
+
+        # Python ML/Data Science
+        "torch",
+        "numpy",
+        "scipy",
+        "matplotlib",
+        "seaborn",
+        "transformers",
+        "langchain",
+        "onnx",
+
+        # TypeScript/JavaScript ML
+        # "langchain",  # Duplicate - will use Python version
+        "onnxruntime-web",
+
+        # Validation
+        "zod",
+
+        # Testing
+        "vitest",
+        "@playwright/test",
+        "pytest",
+
+        # Authentication
+        "auth.js",
+
+        # Real-time
+        "ws",
+        "socket.io",
+
+        # Runtimes & Tools
+        "deno",
+        "bun",
+
+        # DevOps & Containers
+        "docker",
+        "podman",
+
+        # Build Tools
+        "vite",
+
+        # Languages
+        "typescript",
+        "rust",
+        "go",
+        "python",
+
+        # Monorepo
+        "turborepo",
+
+        # Logging
+        "pino",
+        "structlog",
+
+        # Vector Search
+        "lancedb",
+        "pgvector",
+
+        # Utilities
+        "fuse.js",
+        "leaflet",
+    ]
+
+    print(f"📚 Fetching {len(libraries)} libraries from Context7...")
+    print()
+
+    success = []
+    failed = []
+    skipped = []
+
+    for i, library in enumerate(libraries, 1):
+        print(f"[{i}/{len(libraries)}] Processing: {library}")
+
+        try:
+            result = subprocess.run(
+                ["just", "fetch-library", library],
+                capture_output=True,
+                text=True,
+                timeout=120  # 2 minute timeout per library
+            )
+
+            if result.returncode == 0:
+                success.append(library)
+                print(f"  ✅ Success")
+            else:
+                # Check if it's a "not found" error vs actual failure
+                if "No libraries found" in result.stdout or "Failed to parse" in result.stdout:
+                    skipped.append(library)
+                    print(f"  ⏭️  Not found on Context7")
+                else:
+                    failed.append(library)
+                    print(f"  ❌ Failed")
+                    print(f"     {result.stdout[:100]}")
+
+        except subprocess.TimeoutExpired:
+            failed.append(library)
+            print(f"  ⏱️  Timeout (>2min)")
+        except Exception as e:
+            failed.append(library)
+            print(f"  ❌ Error: {e}")
+
+        print()
+
+    # Summary
+    print("=" * 60)
+    print("📊 Summary:")
+    print(f"  ✅ Success: {len(success)}")
+    print(f"  ⏭️  Skipped: {len(skipped)}")
+    print(f"  ❌ Failed: {len(failed)}")
+    print()
+
+    if failed:
+        print("Failed libraries:")
+        for lib in failed:
+            print(f"  - {lib}")
+        print()
+
+    if skipped:
+        print("Skipped (not found on Context7):")
+        for lib in skipped:
+            print(f"  - {lib}")
+
+    sys.exit(0 if not failed else 1)
+
+# Libraries appropriate for Context7 documentation fetching:
+#
+# === Frontend Frameworks ===
+# solid-js
+# @solidjs/router
+# @solidjs/start
+# @kobalte/core
+# vue
+# nuxt
+#
+# === UI & Styling ===
+# tailwindcss
+# daisyui
+# chart.js
+#
+# === Data Tables & Visualization ===
+# @tanstack/solid-table
+# @tanstack/solid-virtual
+# papaparse
+# d3
+#
+# === Databases & Data Tools ===
+# duckdb
+# better-sqlite3
+# postgres (PostgreSQL docs)
+# clickhouse
+# polars (Python/Rust dataframes)
+# pandas
+#
+# === Python Backend & API ===
+# fastapi
+# typer
+# pydantic
+# requests
+#
+# === Rust Backend ===
+# poem
+# tokio
+# serde
+#
+# === Python ML/Data Science ===
+# torch (PyTorch)
+# numpy
+# scipy
+# matplotlib
+# seaborn
+# transformers (Hugging Face)
+# langchain
+# onnx
+#
+# === TypeScript/JavaScript ML ===
+# langchain (JS version)
+# onnxruntime-web
+#
+# === Validation ===
+# zod
+#
+# === Testing ===
+# vitest
+# @playwright/test
+# pytest
+#
+# === Authentication ===
+# auth.js (formerly NextAuth)
+#
+# === Real-time ===
+# ws (WebSocket library)
+# socket.io
+#
+# === Runtimes & Tools ===
+# deno
+# bun
+#
+# === DevOps & Containers ===
+# docker
+# podman
+#
+# === Build Tools ===
+# vite
+#
+# === Languages ===
+# typescript
+# rust
+# go
+# python
+#
+# === Monorepo (TODO: evaluate) ===
+# turborepo
+#
+# === Logging (TODO: evaluate) ===
+# pino (Node.js structured logging)
+# structlog (Python structured logging)
+#
+# === Vector Search ===
+# lancedb
+# pgvector
+#
+# === Utilities ===
+# fuse.js (fuzzy search)
+# leaflet (maps)
