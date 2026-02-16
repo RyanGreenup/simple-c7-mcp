@@ -1,0 +1,4 @@
+fetch-docs:
+    curl 'https://context7.com/solidjs/solid/llms.txt'         > solid.md
+    # This ones better quality
+    curl 'https://context7.com/clickhouse/clickhouse/llms.txt' > clickhouse.md
