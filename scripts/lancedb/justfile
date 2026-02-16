@@ -136,6 +136,155 @@ shell db_path="./lancedb_data" table="documents":
 
     subprocess.run(['bash', '-c', bash_cmd])
 
+# Fetch library docs from Context7 and ingest into LanceDB
+fetch-library library query="":
+    #!/usr/bin/env python3
+    import json
+    import sys
+    import os
+    import subprocess
+    from pathlib import Path
+    import urllib.request
+
+    library = "{{ library }}"
+    query = "{{ query }}" or f"Documentation for {library}"
+
+    print(f"🔍 Resolving library: {library}")
+
+    # Step 1: Call Context7 MCP API directly with proper JSON parsing
+    mcp_url = "https://mcp.context7.com/mcp"
+
+    # Get API key from environment if available
+    api_key = os.environ.get('CONTEXT7_API_KEY', '')
+
+    # Construct MCP request
+    request_data = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": "resolve-library-id",
+            "arguments": {
+                "libraryName": library,
+                "query": query
+            }
+        }
+    }
+
+    # Make the API request
+    headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream'
+    }
+    if api_key:
+        headers['CONTEXT7_API_KEY'] = api_key
+
+    req = urllib.request.Request(
+        mcp_url,
+        data=json.dumps(request_data).encode('utf-8'),
+        headers=headers
+    )
+
+    try:
+        with urllib.request.urlopen(req) as response:
+            result = json.loads(response.read().decode('utf-8'))
+    except Exception as e:
+        print(f"❌ API request failed: {e}")
+        sys.exit(1)
+
+    # Parse the JSON response properly
+    try:
+        # Extract the text content from the MCP response
+        content_text = result['result']['content'][0]['text']
+
+        # Parse all library options from the text
+        libraries = []
+        current_lib = {}
+
+        for line in content_text.split('\n'):
+            line = line.strip()
+
+            if line.startswith('- Title:'):
+                # Save previous library if exists
+                if current_lib.get('id'):
+                    libraries.append(current_lib)
+                current_lib = {'title': line.split('- Title:')[1].strip()}
+
+            elif line.startswith('- Context7-compatible library ID:'):
+                current_lib['id'] = line.split('Context7-compatible library ID:')[1].strip()
+
+            elif line.startswith('- Description:'):
+                current_lib['description'] = line.split('- Description:')[1].strip()
+
+            elif line.startswith('- Benchmark Score:'):
+                try:
+                    current_lib['score'] = float(line.split('- Benchmark Score:')[1].strip())
+                except:
+                    current_lib['score'] = 0
+
+        # Save the last library
+        if current_lib.get('id'):
+            libraries.append(current_lib)
+
+        if not libraries:
+            print("❌ No libraries found in response")
+            print("\nAPI Response:")
+            print(json.dumps(result, indent=2))
+            sys.exit(1)
+
+        # Sort by benchmark score (highest first)
+        libraries.sort(key=lambda x: x.get('score', 0), reverse=True)
+
+        # Pick the best match (highest score)
+        best_match = libraries[0]
+        library_id = best_match['id']
+
+        print(f"✓ Selected: {best_match['title']} (score: {best_match.get('score', 'N/A')})")
+        if len(libraries) > 1:
+            print(f"  (Found {len(libraries)} options, selected highest score)")
+
+    except (KeyError, IndexError, TypeError) as e:
+        print(f"❌ Failed to parse API response: {e}")
+        print("\nRaw response:")
+        print(json.dumps(result, indent=2))
+        sys.exit(1)
+
+    print(f"✓ Resolved library_id: {library_id}")
+
+    # Step 2: Construct URL and download docs
+    # library_id format: /websites/daisyui or /github/org/repo
+    url = f"https://context7.com{library_id}/llms.txt"
+    print(f"📥 Downloading from: {url}")
+
+    try:
+        with urllib.request.urlopen(url) as response:
+            content = response.read().decode('utf-8')
+    except Exception as e:
+        print(f"❌ Failed to download: {e}")
+        sys.exit(1)
+
+    # Step 3: Save to tests/data/{library}.md
+    safe_name = library.lower().replace(' ', '-').replace('.', '-')
+    output_file = Path(f"tests/data/{safe_name}.md")
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(output_file, 'w', encoding='utf-8') as f:
+        f.write(content)
+
+    print(f"✓ Saved to: {output_file}")
+    print(f"📊 Size: {len(content)} bytes")
+
+    # Step 4: Ingest into LanceDB
+    print(f"\n📚 Ingesting into LanceDB...")
+    subprocess.run([
+        'uv', 'run', 'lance-db-example', 'ingest',
+        str(output_file),
+        '--library', safe_name
+    ])
+
+    print(f"\n✅ Complete! Library '{library}' is now in LanceDB")
+    print(f"Try: just search '{library}' --limit 5")
+
 # Demo: Ingest solid.md and search for "throw redirect" (uses markdown-h3 by default)
 demo-solid:
     @echo "📚 Ingesting solid.md with markdown h3 chunking..."
@@ -155,3 +304,10 @@ demo-solid-char:
     uv run lance-db-example search "throw redirect" --limit 3
     @echo ""
     @echo "✅ Demo complete!"
+
+# Demo: Fetch and ingest daisyUI documentation
+demo-daisyui:
+    just fetch-library "daisyUI"
+    @echo ""
+    @echo "🔍 Searching daisyUI docs..."
+    uv run lance-db-example search "button component" --limit 3
