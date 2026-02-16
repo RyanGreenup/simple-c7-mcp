@@ -1,0 +1,381 @@
+"""Document management router.
+
+This module implements RESTful CRUD endpoints for document management,
+including content upload, URL fetching, and various update operations.
+"""
+
+from fastapi import APIRouter, HTTPException, Query
+
+from c7_mcp.schemas.document import (
+    ContentUpdate,
+    DocumentContent,
+    DocumentCreate,
+    DocumentEmbeddings,
+    DocumentFetch,
+    DocumentPretty,
+    DocumentResponse,
+    DocumentTitle,
+    DocumentUpdate,
+    EmbeddingsUpdate,
+    LibraryAssignment,
+    TitleUpdate,
+)
+from c7_mcp.schemas.library import DeleteResponse
+from c7_mcp.services import (
+    document as document_service,  # noqa: F401 - Will be used when TODOs are implemented
+)
+
+router = APIRouter(prefix="/api/v1/documents", tags=["documents"])
+
+
+@router.get("", response_model=list[DocumentResponse])
+async def list_documents(
+    library_id: str | None = Query(None, description="Filter by library ID"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum documents to return"),
+    offset: int = Query(0, ge=0, description="Number of documents to skip"),
+) -> list[DocumentResponse]:
+    """List documents with optional filtering and pagination.
+
+    Args:
+        library_id: Filter documents by library (optional).
+        limit: Maximum number of documents to return (1-1000).
+        offset: Number of documents to skip for pagination.
+
+    Returns:
+        List of documents with metadata (no content).
+
+    TODO: Implement document listing endpoint.
+    TODO: 1. Call document_service.list_documents()
+    TODO: 2. Transform DocumentData to DocumentResponse
+    TODO: 3. Apply library_id filter if provided
+    TODO: 4. Apply pagination (limit, offset)
+    TODO: 5. Handle errors (500 for internal errors)
+    """
+    # Placeholder implementation
+    return []
+
+
+@router.post("", response_model=DocumentResponse, status_code=201)
+async def create_document(document: DocumentCreate) -> DocumentResponse:
+    """Create a document by uploading content.
+
+    Args:
+        document: Document creation data (title, content, library_id).
+
+    Returns:
+        Created document with metadata.
+
+    Raises:
+        HTTPException: 404 if library not found.
+        HTTPException: 501 if not implemented yet.
+
+    TODO: Implement document creation endpoint.
+    TODO: 1. Call document_service.create_document()
+    TODO: 2. Transform DocumentData to DocumentResponse
+    TODO: 3. Handle library not found errors (404)
+    TODO: 4. Handle other errors (500)
+    """
+    raise HTTPException(status_code=501, detail="Not implemented")
+
+
+@router.post("/fetch", response_model=DocumentResponse, status_code=201)
+async def fetch_document(document: DocumentFetch) -> DocumentResponse:
+    """Create a document by fetching content from URL.
+
+    Args:
+        document: Document fetch data (title, url, library_id).
+
+    Returns:
+        Created document with metadata.
+
+    Raises:
+        HTTPException: 404 if library not found.
+        HTTPException: 400 if URL fetch fails.
+        HTTPException: 501 if not implemented yet.
+
+    TODO: Implement document fetch endpoint.
+    TODO: 1. Call document_service.fetch_document()
+    TODO: 2. Transform DocumentData to DocumentResponse
+    TODO: 3. Handle library not found errors (404)
+    TODO: 4. Handle URL fetch errors (400)
+    TODO: 5. Handle other errors (500)
+    """
+    raise HTTPException(status_code=501, detail="Not implemented")
+
+
+@router.get("/{doc_id}", response_model=DocumentResponse)
+async def get_document(doc_id: str) -> DocumentResponse:
+    """Get document metadata by ID (without content).
+
+    Args:
+        doc_id: Document unique identifier.
+
+    Returns:
+        Document metadata (no content).
+
+    Raises:
+        HTTPException: 404 if document not found.
+        HTTPException: 501 if not implemented yet.
+
+    TODO: Implement document metadata retrieval endpoint.
+    TODO: 1. Call document_service.get_document()
+    TODO: 2. Transform DocumentData to DocumentResponse (exclude content)
+    TODO: 3. Handle not found errors (404)
+    TODO: 4. Handle other errors (500)
+    """
+    raise HTTPException(status_code=501, detail="Not implemented")
+
+
+@router.get("/{doc_id}/content", response_model=DocumentContent)
+async def get_document_content(doc_id: str) -> DocumentContent:
+    """Get raw document content.
+
+    Args:
+        doc_id: Document unique identifier.
+
+    Returns:
+        Raw document content.
+
+    Raises:
+        HTTPException: 404 if document not found.
+        HTTPException: 501 if not implemented yet.
+
+    TODO: Implement content retrieval endpoint.
+    TODO: 1. Call document_service.get_content()
+    TODO: 2. Return DocumentContent with raw text
+    TODO: 3. Handle not found errors (404)
+    TODO: 4. Handle other errors (500)
+    """
+    raise HTTPException(status_code=501, detail="Not implemented")
+
+
+@router.get("/{doc_id}/pretty", response_model=DocumentPretty)
+async def get_document_pretty(doc_id: str) -> DocumentPretty:
+    """Get formatted document (title + content).
+
+    Args:
+        doc_id: Document unique identifier.
+
+    Returns:
+        Formatted document with title and content.
+
+    Raises:
+        HTTPException: 404 if document not found.
+        HTTPException: 501 if not implemented yet.
+
+    TODO: Implement formatted document retrieval endpoint.
+    TODO: 1. Call document_service.get_document()
+    TODO: 2. Return DocumentPretty with title and content
+    TODO: 3. Apply formatting (markdown, syntax highlighting, etc.)
+    TODO: 4. Handle not found errors (404)
+    TODO: 5. Handle other errors (500)
+    """
+    raise HTTPException(status_code=501, detail="Not implemented")
+
+
+@router.get("/{doc_id}/title", response_model=DocumentTitle)
+async def get_document_title(doc_id: str) -> DocumentTitle:
+    """Get document title only.
+
+    Args:
+        doc_id: Document unique identifier.
+
+    Returns:
+        Document title.
+
+    Raises:
+        HTTPException: 404 if document not found.
+        HTTPException: 501 if not implemented yet.
+
+    TODO: Implement title retrieval endpoint.
+    TODO: 1. Call document_service.get_document()
+    TODO: 2. Return DocumentTitle with title only
+    TODO: 3. Handle not found errors (404)
+    TODO: 4. Handle other errors (500)
+    """
+    raise HTTPException(status_code=501, detail="Not implemented")
+
+
+@router.get("/{doc_id}/embeddings", response_model=DocumentEmbeddings)
+async def get_document_embeddings(doc_id: str) -> DocumentEmbeddings:
+    """Get document embeddings.
+
+    Args:
+        doc_id: Document unique identifier.
+
+    Returns:
+        Document embeddings with dimension and model info.
+
+    Raises:
+        HTTPException: 404 if document not found or has no embeddings.
+        HTTPException: 501 if not implemented yet.
+
+    TODO: Implement embeddings retrieval endpoint.
+    TODO: 1. Call document_service.get_embeddings()
+    TODO: 2. Return DocumentEmbeddings with vectors and metadata
+    TODO: 3. Handle not found errors (404)
+    TODO: 4. Handle no embeddings errors (404 with specific message)
+    TODO: 5. Handle other errors (500)
+    """
+    raise HTTPException(status_code=501, detail="Not implemented")
+
+
+@router.put("/{doc_id}", response_model=DocumentResponse)
+async def update_document(doc_id: str, document: DocumentUpdate) -> DocumentResponse:
+    """Update document (full update).
+
+    Args:
+        doc_id: Document unique identifier.
+        document: Full document update data.
+
+    Returns:
+        Updated document metadata.
+
+    Raises:
+        HTTPException: 404 if document not found.
+        HTTPException: 404 if target library not found.
+        HTTPException: 501 if not implemented yet.
+
+    TODO: Implement document full update endpoint.
+    TODO: 1. Combine update_content, update_title, update_library calls
+    TODO: 2. Transform DocumentData to DocumentResponse
+    TODO: 3. Handle not found errors (404)
+    TODO: 4. Invalidate embeddings after content update
+    TODO: 5. Handle other errors (500)
+    """
+    raise HTTPException(status_code=501, detail="Not implemented")
+
+
+@router.patch("/{doc_id}/content", response_model=DocumentResponse)
+async def update_document_content(
+    doc_id: str, content_update: ContentUpdate
+) -> DocumentResponse:
+    """Update document content only.
+
+    Args:
+        doc_id: Document unique identifier.
+        content_update: New content.
+
+    Returns:
+        Updated document metadata.
+
+    Raises:
+        HTTPException: 404 if document not found.
+        HTTPException: 501 if not implemented yet.
+
+    TODO: Implement content update endpoint.
+    TODO: 1. Call document_service.update_content()
+    TODO: 2. Transform DocumentData to DocumentResponse
+    TODO: 3. Invalidate embeddings (set has_embeddings to False)
+    TODO: 4. Handle not found errors (404)
+    TODO: 5. Handle other errors (500)
+    """
+    raise HTTPException(status_code=501, detail="Not implemented")
+
+
+@router.patch("/{doc_id}/title", response_model=DocumentResponse)
+async def update_document_title(
+    doc_id: str, title_update: TitleUpdate
+) -> DocumentResponse:
+    """Update document title only.
+
+    Args:
+        doc_id: Document unique identifier.
+        title_update: New title.
+
+    Returns:
+        Updated document metadata.
+
+    Raises:
+        HTTPException: 404 if document not found.
+        HTTPException: 501 if not implemented yet.
+
+    TODO: Implement title update endpoint.
+    TODO: 1. Call document_service.update_title()
+    TODO: 2. Transform DocumentData to DocumentResponse
+    TODO: 3. Handle not found errors (404)
+    TODO: 4. Handle other errors (500)
+    """
+    raise HTTPException(status_code=501, detail="Not implemented")
+
+
+@router.patch("/{doc_id}/library", response_model=DocumentResponse)
+async def update_document_library(
+    doc_id: str, library_assignment: LibraryAssignment
+) -> DocumentResponse:
+    """Move document to a different library.
+
+    Args:
+        doc_id: Document unique identifier.
+        library_assignment: Target library ID.
+
+    Returns:
+        Updated document metadata.
+
+    Raises:
+        HTTPException: 404 if document or target library not found.
+        HTTPException: 501 if not implemented yet.
+
+    TODO: Implement library assignment endpoint.
+    TODO: 1. Call document_service.update_library()
+    TODO: 2. Transform DocumentData to DocumentResponse
+    TODO: 3. Update document counts for both libraries
+    TODO: 4. Handle not found errors (404)
+    TODO: 5. Handle other errors (500)
+    """
+    raise HTTPException(status_code=501, detail="Not implemented")
+
+
+@router.patch("/{doc_id}/embeddings", response_model=DocumentResponse)
+async def update_document_embeddings(
+    doc_id: str, embeddings_update: EmbeddingsUpdate
+) -> DocumentResponse:
+    """Update document embeddings.
+
+    Args:
+        doc_id: Document unique identifier.
+        embeddings_update: New embeddings and optional model info.
+
+    Returns:
+        Updated document metadata.
+
+    Raises:
+        HTTPException: 404 if document not found.
+        HTTPException: 400 if embedding dimension inconsistent.
+        HTTPException: 501 if not implemented yet.
+
+    TODO: Implement embeddings update endpoint.
+    TODO: 1. Call document_service.update_embeddings()
+    TODO: 2. Transform DocumentData to DocumentResponse
+    TODO: 3. Validate embedding dimension consistency
+    TODO: 4. Set has_embeddings to True
+    TODO: 5. Handle not found errors (404)
+    TODO: 6. Handle dimension errors (400)
+    TODO: 7. Handle other errors (500)
+    """
+    raise HTTPException(status_code=501, detail="Not implemented")
+
+
+@router.delete("/{doc_id}", response_model=DeleteResponse)
+async def delete_document(doc_id: str) -> DeleteResponse:
+    """Delete a document.
+
+    Args:
+        doc_id: Document unique identifier.
+
+    Returns:
+        Deletion status and message.
+
+    Raises:
+        HTTPException: 404 if document not found.
+        HTTPException: 501 if not implemented yet.
+
+    TODO: Implement document deletion endpoint.
+    TODO: 1. Call document_service.delete_document()
+    TODO: 2. Return DeleteResponse with success=True
+    TODO: 3. Delete associated embeddings
+    TODO: 4. Update library document count
+    TODO: 5. Handle not found errors (404)
+    TODO: 6. Handle other errors (500)
+    """
+    raise HTTPException(status_code=501, detail="Not implemented")
