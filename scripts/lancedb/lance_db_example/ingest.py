@@ -181,6 +181,12 @@ def ingest(
         "-m",
         help="Sentence transformer model name (use 'simple' for fallback)"
     ),
+    library: Optional[str] = typer.Option(
+        None,
+        "--library",
+        "-lib",
+        help="Library/package name for the documentation (e.g., 'solid-js', 'react')"
+    ),
 ):
     """Ingest a text file into LanceDB.
 
@@ -211,35 +217,54 @@ def ingest(
     # Chunk the text based on strategy
     console.print(f"[yellow]✂️  Chunking text (strategy: {chunking_strategy})...[/yellow]")
 
+    # Initialize chunks and titles
+    chunks = []
+    titles = []
+
     if chunking_strategy == "markdown-h3":
         try:
-            chunks = chunk_markdown_by_level3_headers(text)
+            # Use the metadata-returning version to get titles
+            chunk_dicts = chunk_by_markdown_headers(text, headers_to_split_on=[("###", "h3")], return_metadata=True)
+            chunks = [c['content'] for c in chunk_dicts]
+            # Extract h3 title from metadata, or use a default
+            titles = [c['metadata'].get('h3', 'Untitled') for c in chunk_dicts]
             console.print(f"[dim]Using markdown level 3 header (###) splitting[/dim]")
         except ImportError as e:
             console.print(f"[yellow]⚠️  {e}[/yellow]")
             console.print(f"[yellow]Falling back to character-based chunking...[/yellow]")
             chunks = chunk_text(text, chunk_size=chunk_size, overlap=overlap)
+            titles = [None] * len(chunks)
 
     elif chunking_strategy == "markdown":
         try:
-            chunk_dicts = chunk_by_markdown_headers(text, return_metadata=False)
-            chunks = chunk_dicts if isinstance(chunk_dicts[0], str) else [c['content'] for c in chunk_dicts]
+            chunk_dicts = chunk_by_markdown_headers(text, return_metadata=True)
+            chunks = [c['content'] for c in chunk_dicts]
+            # Extract the most specific header (h3 > h2 > h1)
+            titles = []
+            for c in chunk_dicts:
+                metadata = c['metadata']
+                title = metadata.get('h3') or metadata.get('h2') or metadata.get('h1') or 'Untitled'
+                titles.append(title)
             console.print(f"[dim]Using markdown header (h1/h2/h3) splitting[/dim]")
         except ImportError as e:
             console.print(f"[yellow]⚠️  {e}[/yellow]")
             console.print(f"[yellow]Falling back to character-based chunking...[/yellow]")
             chunks = chunk_text(text, chunk_size=chunk_size, overlap=overlap)
+            titles = [None] * len(chunks)
 
     elif chunking_strategy == "paragraph":
         chunks = chunk_by_paragraphs(text, max_paragraphs=2)
+        titles = [None] * len(chunks)
         console.print(f"[dim]Using paragraph-based splitting[/dim]")
 
     elif chunking_strategy == "sentence":
         chunks = chunk_by_sentences(text, max_sentences=3, overlap_sentences=1)
+        titles = [None] * len(chunks)
         console.print(f"[dim]Using sentence-based splitting[/dim]")
 
     elif chunking_strategy == "character":
         chunks = chunk_text(text, chunk_size=chunk_size, overlap=overlap)
+        titles = [None] * len(chunks)
         console.print(f"[dim]Using character-based splitting (size={chunk_size}, overlap={overlap})[/dim]")
 
     else:
@@ -255,13 +280,21 @@ def ingest(
     embeddings = create_embeddings(chunks, use_transformer=use_transformer, model_name=model)
     console.print(f"[green]✓ Generated {len(embeddings)} embeddings (dim={len(embeddings[0])})[/green]")
 
-    # Create DataFrame
+    # Infer library name from filename if not provided
+    if library is None:
+        # Try to extract from filename (e.g., "solid.md" -> "solid-js")
+        filename_stem = file_path.stem.lower()
+        library = filename_stem
+
+    # Create DataFrame with title and library columns
     data = pd.DataFrame({
         'id': range(len(chunks)),
         'text': chunks,
         'vector': embeddings,
         'source': [str(file_path)] * len(chunks),
         'chunk_index': range(len(chunks)),
+        'title': titles,
+        'library': [library] * len(chunks),
     })
 
     # Connect to LanceDB
@@ -357,11 +390,24 @@ def search(
         distance = row.get('_distance', 'N/A')
         text = row['text']
         chunk_idx = row.get('chunk_index', idx)
+        title = row.get('title', None)
+        library = row.get('library', None)
+
+        # Build header info
+        header_parts = [f"[bold]Result {idx + 1}[/bold]"]
+        if library:
+            header_parts.append(f"library: {library}")
+        if title:
+            header_parts.append(f"title: {title}")
+        header_parts.append(f"distance: {distance:.4f}")
+        header_parts.append(f"chunk: {chunk_idx}")
+
+        header = " | ".join(header_parts)
 
         # Truncate long text
         display_text = text[:300] + "..." if len(text) > 300 else text
 
-        console.print(f"[bold]Result {idx + 1}[/bold] (distance: {distance:.4f}, chunk: {chunk_idx})")
+        console.print(header)
         console.print(Panel(display_text, border_style="blue"))
         console.print()
 
