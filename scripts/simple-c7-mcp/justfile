@@ -14,7 +14,7 @@ format:
     ruff format
 
 test:
-    uv run pytest -v .
+    pytest -v tests
 
 # Run integration tests against a live server (requires: just serve)
 test-integration port="8000":

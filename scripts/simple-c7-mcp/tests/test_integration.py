@@ -16,10 +16,13 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
+from uuid import uuid4
 
 import httpx
 
 BASE_URL = "http://localhost:8000"
+TEST_LIBRARY_NAME = f"IntegrationTestLib-{uuid4().hex[:8]}"
+TEST_LIBRARY_UPDATED_NAME = f"{TEST_LIBRARY_NAME}-updated"
 
 
 # ---------------------------------------------------------------------------
@@ -34,7 +37,7 @@ class Status(str, Enum):
 
 
 @dataclass
-class TestResult:
+class CaseResult:
     name: str
     status: Status
     detail: str = ""
@@ -43,10 +46,10 @@ class TestResult:
 @dataclass
 class Suite:
     name: str
-    results: list[TestResult] = field(default_factory=list)
+    results: list[CaseResult] = field(default_factory=list)
 
     def add(self, name: str, status: Status, detail: str = "") -> None:
-        self.results.append(TestResult(name, status, detail))
+        self.results.append(CaseResult(name, status, detail))
 
     @property
     def passed(self) -> int:
@@ -140,7 +143,7 @@ def call(
 # ---------------------------------------------------------------------------
 
 
-def test_health(client: httpx.Client) -> Suite:
+def run_health(client: httpx.Client) -> Suite:
     suite = Suite("Health")
     call(suite, "GET /health → 200 + status=healthy",
          lambda: client.get("/health"), 200,
@@ -148,7 +151,7 @@ def test_health(client: httpx.Client) -> Suite:
     return suite
 
 
-def test_libraries(client: httpx.Client) -> tuple[Suite, str | None]:
+def run_libraries(client: httpx.Client) -> tuple[Suite, str | None]:
     """Returns (suite, library_id) for use by downstream suites."""
     suite = Suite("Libraries")
     created_id: str | None = None
@@ -160,7 +163,7 @@ def test_libraries(client: httpx.Client) -> tuple[Suite, str | None]:
 
     # create
     payload = {
-        "name": "IntegrationTestLib",
+        "name": TEST_LIBRARY_NAME,
         "language": "Python",
         "ecosystem": "pypi",
         "description": "Created by integration test",
@@ -172,9 +175,9 @@ def test_libraries(client: httpx.Client) -> tuple[Suite, str | None]:
     if body:
         created_id = body.get("id")
 
-    # duplicate → 400
-    call(suite, "POST /api/v1/libraries duplicate → 400",
-         lambda: client.post("/api/v1/libraries", json=payload), 400)
+    # duplicate → 409
+    call(suite, "POST /api/v1/libraries duplicate → 409",
+         lambda: client.post("/api/v1/libraries", json=payload), 409)
 
     # get by id
     if created_id:
@@ -183,7 +186,7 @@ def test_libraries(client: httpx.Client) -> tuple[Suite, str | None]:
              lambda: client.get(f"/api/v1/libraries/{_id}"), 200,
              checks=[
                  (lambda b: b.get("id") == _id, "id matches"),
-                 (lambda b: b.get("name") == "IntegrationTestLib", "name matches"),
+                 (lambda b: b.get("name") == TEST_LIBRARY_NAME, "name matches"),
              ])
 
     # get non-existent → 404
@@ -195,9 +198,9 @@ def test_libraries(client: httpx.Client) -> tuple[Suite, str | None]:
         _id = created_id
         call(suite, "PUT /api/v1/libraries/{id} → 200 updated",
              lambda: client.put(f"/api/v1/libraries/{_id}",
-                                json={"name": "IntegrationTestLibUpdated", "description": "updated"}),
+                                json={"name": TEST_LIBRARY_UPDATED_NAME, "description": "updated"}),
              200,
-             checks=[(lambda b: b.get("name") == "IntegrationTestLibUpdated", "name updated")])
+             checks=[(lambda b: b.get("name") == TEST_LIBRARY_UPDATED_NAME, "name updated")])
 
     # PATCH partial update
     if created_id:
@@ -218,7 +221,7 @@ def test_libraries(client: httpx.Client) -> tuple[Suite, str | None]:
     return suite, created_id
 
 
-def test_documents(client: httpx.Client, library_id: str | None) -> tuple[Suite, str | None]:
+def run_documents(client: httpx.Client, library_id: str | None) -> tuple[Suite, str | None]:
     """Returns (suite, doc_id) for use by cleanup suite."""
     suite = Suite("Documents")
     created_doc_id: str | None = None
@@ -364,7 +367,7 @@ def test_documents(client: httpx.Client, library_id: str | None) -> tuple[Suite,
     return suite, created_doc_id
 
 
-def test_document_fetch(
+def run_document_fetch(
     client: httpx.Client,
     library_id: str | None,
     *,
@@ -406,7 +409,7 @@ def test_document_fetch(
     return suite
 
 
-def test_mcp(client: httpx.Client, library_id: str | None) -> Suite:
+def run_mcp(client: httpx.Client, library_id: str | None) -> Suite:
     suite = Suite("MCP Tools")
 
     # resolve-library-id
@@ -414,7 +417,7 @@ def test_mcp(client: httpx.Client, library_id: str | None) -> Suite:
          lambda: client.post("/mcp", json={
              "jsonrpc": "2.0", "id": 1, "method": "tools/call",
              "params": {"name": "resolve-library-id",
-                        "arguments": {"libraryName": "IntegrationTestLib",
+                        "arguments": {"libraryName": TEST_LIBRARY_NAME,
                                       "query": "Python test library"}},
          }), 200,
          checks=[
@@ -455,7 +458,7 @@ def test_mcp(client: httpx.Client, library_id: str | None) -> Suite:
     return suite
 
 
-def test_cleanup(
+def run_cleanup(
     client: httpx.Client, doc_id: str | None, library_id: str | None
 ) -> Suite:
     suite = Suite("Cleanup (delete)")
@@ -517,6 +520,42 @@ def print_suite(suite: Suite, use_color: bool = True) -> None:
             print(line)
 
 
+def run_suites(client: httpx.Client, *, include_fetch: bool = False) -> list[Suite]:
+    """Execute all integration suites with shared state."""
+    all_suites: list[Suite] = []
+
+    all_suites.append(run_health(client))
+
+    lib_suite, library_id = run_libraries(client)
+    all_suites.append(lib_suite)
+
+    doc_suite, doc_id = run_documents(client, library_id)
+    all_suites.append(doc_suite)
+
+    all_suites.append(run_document_fetch(client, library_id, run=include_fetch))
+    all_suites.append(run_mcp(client, library_id))
+    all_suites.append(run_cleanup(client, doc_id, library_id))
+
+    return all_suites
+
+
+def assert_no_failures(suites: list[Suite]) -> None:
+    """Fail pytest with a readable summary when any case fails."""
+    failures = [
+        f"{suite.name}: {result.name} ({result.detail})"
+        for suite in suites
+        for result in suite.results
+        if result.status == Status.FAIL
+    ]
+    assert not failures, "Integration failures:\n" + "\n".join(failures)
+
+
+def test_integration_flow(client: httpx.Client) -> None:
+    """Pytest entrypoint for integration coverage."""
+    suites = run_suites(client, include_fetch=False)
+    assert_no_failures(suites)
+
+
 def run_all(base_url: str, *, include_fetch: bool = False) -> int:
     """Run all suites. Returns 0 on success (all pass or skip), 1 on failures, 2 on connection error."""
     use_color = sys.stdout.isatty()
@@ -536,20 +575,8 @@ def run_all(base_url: str, *, include_fetch: bool = False) -> int:
         print(f"\nERROR: Server at {base_url} is not responding (timeout)")
         return 2
 
-    client = httpx.Client(base_url=base_url, timeout=15.0)
-    all_suites: list[Suite] = []
-
-    all_suites.append(test_health(client))
-
-    lib_suite, library_id = test_libraries(client)
-    all_suites.append(lib_suite)
-
-    doc_suite, doc_id = test_documents(client, library_id)
-    all_suites.append(doc_suite)
-
-    all_suites.append(test_document_fetch(client, library_id, run=include_fetch))
-    all_suites.append(test_mcp(client, library_id))
-    all_suites.append(test_cleanup(client, doc_id, library_id))
+    with httpx.Client(base_url=base_url, timeout=15.0) as client:
+        all_suites = run_suites(client, include_fetch=include_fetch)
 
     for suite in all_suites:
         print_suite(suite, use_color)

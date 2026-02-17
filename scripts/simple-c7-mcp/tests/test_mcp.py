@@ -22,10 +22,14 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
+from uuid import uuid4
 
 import httpx
 
 BASE_URL = "http://localhost:8000"
+TEST_LIB_NAME = f"MCPTestLib-{uuid4().hex[:8]}"
+TEST_EMPTY_LIB_NAME = f"MCPEmptyLib-{uuid4().hex[:8]}"
+TEST_LIB_PREFIX = "MCPTestLib"
 
 # ---------------------------------------------------------------------------
 # Suite infrastructure (mirrors test_integration.py so each file is standalone)
@@ -39,7 +43,7 @@ class Status(str, Enum):
 
 
 @dataclass
-class TestResult:
+class CaseResult:
     name: str
     status: Status
     detail: str = ""
@@ -48,10 +52,10 @@ class TestResult:
 @dataclass
 class Suite:
     name: str
-    results: list[TestResult] = field(default_factory=list)
+    results: list[CaseResult] = field(default_factory=list)
 
     def add(self, name: str, status: Status, detail: str = "") -> None:
-        self.results.append(TestResult(name, status, detail))
+        self.results.append(CaseResult(name, status, detail))
 
     @property
     def passed(self) -> int:
@@ -201,7 +205,7 @@ def setup_fixtures(client: httpx.Client) -> tuple[Suite, Fixtures]:
 
     # --- MCPTestLib ---
     lib_payload = {
-        "name": "MCPTestLib",
+        "name": TEST_LIB_NAME,
         "language": "Python",
         "ecosystem": "pypi",
         "description": "Library for MCP integration tests",
@@ -220,7 +224,7 @@ def setup_fixtures(client: httpx.Client) -> tuple[Suite, Fixtures]:
 
     # --- MCPEmptyLib ---
     empty_payload = {
-        "name": "MCPEmptyLib",
+        "name": TEST_EMPTY_LIB_NAME,
         "language": "Python",
         "ecosystem": "pypi",
         "description": "Empty library for MCP edge-case tests",
@@ -310,7 +314,7 @@ def teardown_fixtures(client: httpx.Client, fix: Fixtures) -> Suite:
 # ---------------------------------------------------------------------------
 
 
-def test_protocol(client: httpx.Client, fix: Fixtures) -> Suite:
+def run_protocol(client: httpx.Client, fix: Fixtures) -> Suite:
     """JSON-RPC 2.0 envelope conformance."""
     suite = Suite("MCP Protocol")
 
@@ -319,7 +323,7 @@ def test_protocol(client: httpx.Client, fix: Fixtures) -> Suite:
         suite,
         "response has jsonrpc='2.0'",
         client,
-        rpc("resolve-library-id", {"libraryName": "MCPTestLib", "query": "test"}),
+        rpc("resolve-library-id", {"libraryName": TEST_LIB_NAME, "query": "test"}),
         200,
         checks=[(lambda b: b.get("jsonrpc") == "2.0", "jsonrpc == '2.0'")],
     )
@@ -328,7 +332,7 @@ def test_protocol(client: httpx.Client, fix: Fixtures) -> Suite:
         suite,
         "response has 'result' key",
         client,
-        rpc("resolve-library-id", {"libraryName": "MCPTestLib", "query": "test"}),
+        rpc("resolve-library-id", {"libraryName": TEST_LIB_NAME, "query": "test"}),
         200,
         checks=[(lambda b: "result" in b, "result key present")],
     )
@@ -337,7 +341,7 @@ def test_protocol(client: httpx.Client, fix: Fixtures) -> Suite:
         suite,
         "result.content is a list",
         client,
-        rpc("resolve-library-id", {"libraryName": "MCPTestLib", "query": "test"}),
+        rpc("resolve-library-id", {"libraryName": TEST_LIB_NAME, "query": "test"}),
         200,
         checks=[
             (
@@ -351,7 +355,7 @@ def test_protocol(client: httpx.Client, fix: Fixtures) -> Suite:
         suite,
         "result.content[0].type == 'text'",
         client,
-        rpc("resolve-library-id", {"libraryName": "MCPTestLib", "query": "test"}),
+        rpc("resolve-library-id", {"libraryName": TEST_LIB_NAME, "query": "test"}),
         200,
         checks=[
             (
@@ -365,7 +369,7 @@ def test_protocol(client: httpx.Client, fix: Fixtures) -> Suite:
         suite,
         "result.content[0].text is a non-empty string",
         client,
-        rpc("resolve-library-id", {"libraryName": "MCPTestLib", "query": "test"}),
+        rpc("resolve-library-id", {"libraryName": TEST_LIB_NAME, "query": "test"}),
         200,
         checks=[
             (
@@ -438,7 +442,7 @@ def test_protocol(client: httpx.Client, fix: Fixtures) -> Suite:
     return suite
 
 
-def test_resolve_library(client: httpx.Client, fix: Fixtures) -> Suite:
+def run_resolve_library(client: httpx.Client, fix: Fixtures) -> Suite:
     """resolve-library-id tool — all branches."""
     suite = Suite("MCP resolve-library-id")
 
@@ -447,7 +451,7 @@ def test_resolve_library(client: httpx.Client, fix: Fixtures) -> Suite:
         suite,
         "exact name match → 200",
         client,
-        rpc("resolve-library-id", {"libraryName": "MCPTestLib", "query": "test"}),
+        rpc("resolve-library-id", {"libraryName": TEST_LIB_NAME, "query": "test"}),
         200,
     )
 
@@ -455,7 +459,7 @@ def test_resolve_library(client: httpx.Client, fix: Fixtures) -> Suite:
         suite,
         "result text contains 'Context7-compatible library ID:'",
         client,
-        rpc("resolve-library-id", {"libraryName": "MCPTestLib", "query": "test"}),
+        rpc("resolve-library-id", {"libraryName": TEST_LIB_NAME, "query": "test"}),
         200,
         checks=[
             (
@@ -471,7 +475,7 @@ def test_resolve_library(client: httpx.Client, fix: Fixtures) -> Suite:
             suite,
             "result text contains the library's context7_id",
             client,
-            rpc("resolve-library-id", {"libraryName": "MCPTestLib", "query": "test"}),
+            rpc("resolve-library-id", {"libraryName": TEST_LIB_NAME, "query": "test"}),
             200,
             checks=[
                 (
@@ -491,10 +495,10 @@ def test_resolve_library(client: httpx.Client, fix: Fixtures) -> Suite:
         suite,
         "result text contains library name",
         client,
-        rpc("resolve-library-id", {"libraryName": "MCPTestLib", "query": "test"}),
+        rpc("resolve-library-id", {"libraryName": TEST_LIB_NAME, "query": "test"}),
         200,
         checks=[
-            (lambda b: "MCPTestLib" in mcp_text(b), "text contains library name")
+            (lambda b: TEST_LIB_NAME in mcp_text(b), "text contains library name")
         ],
     )
 
@@ -504,7 +508,7 @@ def test_resolve_library(client: httpx.Client, fix: Fixtures) -> Suite:
         suite,
         "partial name match (LIKE prefix) → 200",
         client,
-        rpc("resolve-library-id", {"libraryName": "MCPTest", "query": "test library"}),
+        rpc("resolve-library-id", {"libraryName": TEST_LIB_PREFIX, "query": "test library"}),
         200,
         checks=[
             (lambda b: len(mcp_text(b)) > 0, "non-empty result for partial match")
@@ -536,7 +540,7 @@ def test_resolve_library(client: httpx.Client, fix: Fixtures) -> Suite:
             "jsonrpc": "2.0", "id": 1, "method": "tools/call",
             "params": {
                 "name": "resolve-library-id",
-                "arguments": {"library_name": "MCPTestLib", "query": "test"},
+                "arguments": {"library_name": TEST_LIB_NAME, "query": "test"},
             },
         }),
         422,
@@ -547,7 +551,7 @@ def test_resolve_library(client: httpx.Client, fix: Fixtures) -> Suite:
         suite,
         "empty query string is accepted",
         client,
-        rpc("resolve-library-id", {"libraryName": "MCPTestLib", "query": ""}),
+        rpc("resolve-library-id", {"libraryName": TEST_LIB_NAME, "query": ""}),
         200,
     )
 
@@ -557,14 +561,14 @@ def test_resolve_library(client: httpx.Client, fix: Fixtures) -> Suite:
         suite,
         "very long query string is accepted",
         client,
-        rpc("resolve-library-id", {"libraryName": "MCPTestLib", "query": long_query}),
+        rpc("resolve-library-id", {"libraryName": TEST_LIB_NAME, "query": long_query}),
         200,
     )
 
     return suite
 
 
-def test_query_docs(client: httpx.Client, fix: Fixtures) -> Suite:
+def run_query_docs(client: httpx.Client, fix: Fixtures) -> Suite:
     """query-docs tool — all branches."""
     suite = Suite("MCP query-docs")
 
@@ -765,6 +769,42 @@ def print_suite(suite: Suite, use_color: bool = True) -> None:
             print(line)
 
 
+def run_suites(client: httpx.Client) -> list[Suite]:
+    """Execute setup, MCP suites, and teardown."""
+    setup_suite, fix = setup_fixtures(client)
+
+    suites = [setup_suite]
+    try:
+        suites.extend(
+            [
+                run_protocol(client, fix),
+                run_resolve_library(client, fix),
+                run_query_docs(client, fix),
+            ]
+        )
+    finally:
+        suites.append(teardown_fixtures(client, fix))
+
+    return suites
+
+
+def assert_no_failures(suites: list[Suite]) -> None:
+    """Fail pytest with a readable summary when any case fails."""
+    failures = [
+        f"{suite.name}: {result.name} ({result.detail})"
+        for suite in suites
+        for result in suite.results
+        if result.status == Status.FAIL
+    ]
+    assert not failures, "MCP failures:\n" + "\n".join(failures)
+
+
+def test_mcp_flow(client: httpx.Client) -> None:
+    """Pytest entrypoint for MCP integration coverage."""
+    suites = run_suites(client)
+    assert_no_failures(suites)
+
+
 def run_all(base_url: str) -> int:
     use_color = sys.stdout.isatty()
 
@@ -782,19 +822,8 @@ def run_all(base_url: str) -> int:
         print(f"\nERROR: Server at {base_url} is not responding (timeout)")
         return 2
 
-    client = httpx.Client(base_url=base_url, timeout=15.0)
-
-    # Setup
-    setup_suite, fix = setup_fixtures(client)
-
-    # Suites
-    suites = [
-        setup_suite,
-        test_protocol(client, fix),
-        test_resolve_library(client, fix),
-        test_query_docs(client, fix),
-        teardown_fixtures(client, fix),
-    ]
+    with httpx.Client(base_url=base_url, timeout=15.0) as client:
+        suites = run_suites(client)
 
     for suite in suites:
         print_suite(suite, use_color)
