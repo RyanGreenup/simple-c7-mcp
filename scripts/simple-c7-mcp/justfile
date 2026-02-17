@@ -20,6 +20,10 @@ test:
 test-integration port="8000":
     uv run python tests/test_integration.py --base-url http://localhost:{{ port }}
 
+# Run MCP-specific tests against a live server (requires: just serve)
+test-mcp port="8000":
+    uv run python tests/test_mcp.py --base-url http://localhost:{{ port }}
+
 # Run integration tests including outbound URL-fetch tests (may be slow / rate-limited)
 test-integration-full port="8000":
     uv run python tests/test_integration.py --base-url http://localhost:{{ port }} --include-fetch
