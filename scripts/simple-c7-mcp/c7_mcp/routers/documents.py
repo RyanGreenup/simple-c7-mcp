@@ -407,13 +407,26 @@ async def update_document_title(
         HTTPException: 404 if document not found.
         HTTPException: 501 if not implemented yet.
 
-    TODO: Implement title update endpoint.
-    TODO: 1. Call document_service.update_title()
-    TODO: 2. Transform DocumentData to DocumentResponse
-    TODO: 3. Handle not found errors (404)
-    TODO: 4. Handle other errors (500)
     """
-    raise HTTPException(status_code=501, detail="Not implemented")
+    try:
+        data = document_service.update_title(doc_id, title_update.title)
+
+        return DocumentResponse(
+            id=data["id"],
+            title=data["title"],
+            library_id=data["library_id"],
+            created_at=data["created_at"],
+            updated_at=data["updated_at"],
+            has_embeddings=data["has_embeddings"],
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update title: {str(e)}"
+        )
 
 
 @router.patch("/{doc_id}/library", response_model=DocumentResponse)
@@ -433,14 +446,32 @@ async def update_document_library(
         HTTPException: 404 if document or target library not found.
         HTTPException: 501 if not implemented yet.
 
-    TODO: Implement library assignment endpoint.
-    TODO: 1. Call document_service.update_library()
-    TODO: 2. Transform DocumentData to DocumentResponse
-    TODO: 3. Update document counts for both libraries
-    TODO: 4. Handle not found errors (404)
-    TODO: 5. Handle other errors (500)
     """
-    raise HTTPException(status_code=501, detail="Not implemented")
+    try:
+        data = document_service.update_library(
+            doc_id, library_assignment.library_id
+        )
+
+        return DocumentResponse(
+            id=data["id"],
+            title=data["title"],
+            library_id=data["library_id"],
+            created_at=data["created_at"],
+            updated_at=data["updated_at"],
+            has_embeddings=data["has_embeddings"],
+        )
+
+    except ValueError as e:
+        error_msg = str(e)
+        if "not found" in error_msg.lower():
+            raise HTTPException(status_code=404, detail=error_msg)
+        else:
+            raise HTTPException(status_code=400, detail=error_msg)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to move document: {str(e)}"
+        )
 
 
 @router.patch("/{doc_id}/embeddings", response_model=DocumentResponse)
@@ -461,16 +492,36 @@ async def update_document_embeddings(
         HTTPException: 400 if embedding dimension inconsistent.
         HTTPException: 501 if not implemented yet.
 
-    TODO: Implement embeddings update endpoint.
-    TODO: 1. Call document_service.update_embeddings()
-    TODO: 2. Transform DocumentData to DocumentResponse
-    TODO: 3. Validate embedding dimension consistency
-    TODO: 4. Set has_embeddings to True
-    TODO: 5. Handle not found errors (404)
-    TODO: 6. Handle dimension errors (400)
-    TODO: 7. Handle other errors (500)
     """
-    raise HTTPException(status_code=501, detail="Not implemented")
+    try:
+        data = document_service.update_embeddings(
+            doc_id,
+            embeddings_update.embeddings,
+            model=embeddings_update.model,
+        )
+
+        return DocumentResponse(
+            id=data["id"],
+            title=data["title"],
+            library_id=data["library_id"],
+            created_at=data["created_at"],
+            updated_at=data["updated_at"],
+            has_embeddings=data["has_embeddings"],
+        )
+
+    except ValueError as e:
+        error_msg = str(e)
+        if "not found" in error_msg.lower():
+            raise HTTPException(status_code=404, detail=error_msg)
+        elif "dimension" in error_msg.lower():
+            raise HTTPException(status_code=400, detail=error_msg)
+        else:
+            raise HTTPException(status_code=400, detail=error_msg)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update embeddings: {str(e)}"
+        )
 
 
 @router.delete("/{doc_id}", response_model=DeleteResponse)
@@ -487,12 +538,17 @@ async def delete_document(doc_id: str) -> DeleteResponse:
         HTTPException: 404 if document not found.
         HTTPException: 501 if not implemented yet.
 
-    TODO: Implement document deletion endpoint.
-    TODO: 1. Call document_service.delete_document()
-    TODO: 2. Return DeleteResponse with success=True
-    TODO: 3. Delete associated embeddings
-    TODO: 4. Update library document count
-    TODO: 5. Handle not found errors (404)
-    TODO: 6. Handle other errors (500)
     """
-    raise HTTPException(status_code=501, detail="Not implemented")
+    try:
+        document_service.delete_document(doc_id)
+        return DeleteResponse(
+            success=True, message=f"Document '{doc_id}' deleted successfully"
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete document: {str(e)}"
+        )

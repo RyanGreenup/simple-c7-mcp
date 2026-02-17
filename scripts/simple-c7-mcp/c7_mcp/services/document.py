@@ -527,6 +527,8 @@ def full_update_document(
 def update_title(doc_id: str, title: str) -> DocumentData:
     """Update document title.
 
+    Uses delete-then-re-add pattern since LanceDB has no UPDATE.
+
     Args:
         doc_id: Document unique identifier.
         title: New document title.
@@ -536,27 +538,65 @@ def update_title(doc_id: str, title: str) -> DocumentData:
 
     Raises:
         ValueError: If document not found.
-
-    TODO: Implement title update logic.
-    TODO: 1. Verify document exists
-    TODO: 2. Update title field
-    TODO: 3. Update updated_at timestamp
     """
-    # Placeholder implementation
+    import json
+
+    from c7_mcp.db import get_documents_table
+
+    documents = get_documents_table()
     now = datetime.now()
+
+    results = (
+        documents.search()
+        .where(f"document_id = '{doc_id}'", prefilter=True)
+        .limit(1000)
+        .to_list()
+    )
+    if not results:
+        raise ValueError(f"Document '{doc_id}' not found")
+
+    first_chunk = results[0]
+    original_created_at = first_chunk["created_at"]
+    metadata = json.loads(first_chunk.get("metadata_json", "{}"))
+    has_embeddings = metadata.get("has_real_embeddings", False)
+
+    documents.delete(f"document_id = '{doc_id}'")
+
+    document_data = {
+        "id": hash(doc_id) & 0x7FFFFFFF,
+        "document_id": doc_id,
+        "library_id": first_chunk["library_id"],
+        "title": title,
+        "text": first_chunk["text"],
+        "chunk_index": 0,
+        "chunk_total": 1,
+        "source": first_chunk["source"],
+        "source_type": first_chunk["source_type"],
+        "vector": first_chunk["vector"],
+        "metadata_json": first_chunk["metadata_json"],
+        "created_at": original_created_at,
+        "library_name": first_chunk["library_name"],
+        "library_language": first_chunk["library_language"],
+        "library_ecosystem": first_chunk["library_ecosystem"],
+    }
+
+    documents.add([document_data])
+
     return {
         "id": doc_id,
         "title": title,
-        "library_id": "lib-placeholder",
-        "content": "Placeholder content",
-        "created_at": now,
+        "library_id": first_chunk["library_id"],
+        "content": first_chunk["text"],
+        "created_at": original_created_at,
         "updated_at": now,
-        "has_embeddings": False,
+        "has_embeddings": has_embeddings,
     }
 
 
 def update_library(doc_id: str, library_id: str) -> DocumentData:
     """Move document to a different library.
+
+    Uses delete-then-re-add pattern since LanceDB has no UPDATE.
 
     Args:
         doc_id: Document unique identifier.
@@ -567,24 +607,73 @@ def update_library(doc_id: str, library_id: str) -> DocumentData:
 
     Raises:
         ValueError: If document or target library not found.
-
-    TODO: Implement library assignment logic.
-    TODO: 1. Verify document exists
-    TODO: 2. Verify target library exists
-    TODO: 3. Update library_id field
-    TODO: 4. Update document counts for both libraries
-    TODO: 5. Update updated_at timestamp
     """
-    # Placeholder implementation
+    import json
+
+    from c7_mcp.db import get_documents_table, get_libraries_table
+
+    documents = get_documents_table()
     now = datetime.now()
+
+    # 1. Verify document exists
+    results = (
+        documents.search()
+        .where(f"document_id = '{doc_id}'", prefilter=True)
+        .limit(1000)
+        .to_list()
+    )
+    if not results:
+        raise ValueError(f"Document '{doc_id}' not found")
+
+    first_chunk = results[0]
+    original_created_at = first_chunk["created_at"]
+    metadata = json.loads(first_chunk.get("metadata_json", "{}"))
+    has_embeddings = metadata.get("has_real_embeddings", False)
+
+    # 2. Verify target library exists
+    libraries = get_libraries_table()
+    lib_results = (
+        libraries.search()
+        .where(f"id = '{library_id}'", prefilter=True)
+        .limit(1)
+        .to_list()
+    )
+    if not lib_results:
+        raise ValueError(f"Library with ID '{library_id}' not found")
+
+    library = lib_results[0]
+
+    # 3. Delete and re-add with new library
+    documents.delete(f"document_id = '{doc_id}'")
+
+    document_data = {
+        "id": hash(doc_id) & 0x7FFFFFFF,
+        "document_id": doc_id,
+        "library_id": library_id,
+        "title": first_chunk["title"],
+        "text": first_chunk["text"],
+        "chunk_index": 0,
+        "chunk_total": 1,
+        "source": first_chunk["source"],
+        "source_type": first_chunk["source_type"],
+        "vector": first_chunk["vector"],
+        "metadata_json": first_chunk["metadata_json"],
+        "created_at": original_created_at,
+        "library_name": library["name"],
+        "library_language": library["language"],
+        "library_ecosystem": library["ecosystem"],
+    }
+
+    documents.add([document_data])
+
     return {
         "id": doc_id,
-        "title": "Placeholder Document",
+        "title": first_chunk["title"],
         "library_id": library_id,
-        "content": "Placeholder content",
-        "created_at": now,
+        "content": first_chunk["text"],
+        "created_at": original_created_at,
         "updated_at": now,
-        "has_embeddings": False,
+        "has_embeddings": has_embeddings,
     }
 
 
@@ -592,6 +681,8 @@ def update_embeddings(
     doc_id: str, embeddings: list[float], model: str | None = None
 ) -> DocumentData:
     """Update document embeddings.
+
+    Uses delete-then-re-add pattern since LanceDB has no UPDATE.
 
     Args:
         doc_id: Document unique identifier.
@@ -602,30 +693,74 @@ def update_embeddings(
         Updated document data.
 
     Raises:
-        ValueError: If document not found.
-
-    TODO: Implement embeddings update logic.
-    TODO: 1. Verify document exists
-    TODO: 2. Validate embedding dimension consistency
-    TODO: 3. Store embeddings and model info
-    TODO: 4. Set has_embeddings to True
-    TODO: 5. Update updated_at timestamp
+        ValueError: If document not found or dimension mismatch.
     """
-    # Placeholder implementation
+    import json
+
+    from c7_mcp.db import get_documents_table
+
+    documents = get_documents_table()
     now = datetime.now()
+
+    results = (
+        documents.search()
+        .where(f"document_id = '{doc_id}'", prefilter=True)
+        .limit(1000)
+        .to_list()
+    )
+    if not results:
+        raise ValueError(f"Document '{doc_id}' not found")
+
+    first_chunk = results[0]
+    original_created_at = first_chunk["created_at"]
+
+    # Validate dimension (must match configured vector size of 2560)
+    expected_dim = len(first_chunk["vector"])
+    if len(embeddings) != expected_dim:
+        raise ValueError(
+            f"Embedding dimension mismatch: got {len(embeddings)}, "
+            f"expected {expected_dim}"
+        )
+
+    documents.delete(f"document_id = '{doc_id}'")
+
+    metadata: dict[str, bool | str] = {"has_real_embeddings": True}
+    if model:
+        metadata["embedding_model"] = model
+
+    document_data = {
+        "id": hash(doc_id) & 0x7FFFFFFF,
+        "document_id": doc_id,
+        "library_id": first_chunk["library_id"],
+        "title": first_chunk["title"],
+        "text": first_chunk["text"],
+        "chunk_index": 0,
+        "chunk_total": 1,
+        "source": first_chunk["source"],
+        "source_type": first_chunk["source_type"],
+        "vector": embeddings,
+        "metadata_json": json.dumps(metadata),
+        "created_at": original_created_at,
+        "library_name": first_chunk["library_name"],
+        "library_language": first_chunk["library_language"],
+        "library_ecosystem": first_chunk["library_ecosystem"],
+    }
+
+    documents.add([document_data])
+
     return {
         "id": doc_id,
-        "title": "Placeholder Document",
-        "library_id": "lib-placeholder",
-        "content": "Placeholder content",
-        "created_at": now,
+        "title": first_chunk["title"],
+        "library_id": first_chunk["library_id"],
+        "content": first_chunk["text"],
+        "created_at": original_created_at,
         "updated_at": now,
         "has_embeddings": True,
     }
 
 
 def delete_document(doc_id: str) -> bool:
-    """Delete a document.
+    """Delete a document and all its chunks.
 
     Args:
         doc_id: Document unique identifier.
@@ -635,13 +770,22 @@ def delete_document(doc_id: str) -> bool:
 
     Raises:
         ValueError: If document not found.
-
-    TODO: Implement document deletion logic.
-    TODO: 1. Verify document exists
-    TODO: 2. Delete document from database
-    TODO: 3. Delete associated embeddings
-    TODO: 4. Update library document count
-    TODO: 5. Clean up associated resources
     """
-    # Placeholder implementation
+    from c7_mcp.db import get_documents_table
+
+    documents = get_documents_table()
+
+    # Verify document exists
+    results = (
+        documents.search()
+        .where(f"document_id = '{doc_id}'", prefilter=True)
+        .limit(1)
+        .to_list()
+    )
+    if not results:
+        raise ValueError(f"Document '{doc_id}' not found")
+
+    # Delete all chunks for this document
+    documents.delete(f"document_id = '{doc_id}'")
+
     return True

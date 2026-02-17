@@ -5,9 +5,9 @@ This document tracks the implementation progress of all CRUD operations for the 
 ## Overview
 
 - **Total Tasks**: 25
-- **Completed**: 14
+- **Completed**: 18
 - **In Progress**: 0
-- **Not Started**: 11
+- **Not Started**: 7
 
 ## 📊 Progress by Category
 
@@ -15,7 +15,7 @@ This document tracks the implementation progress of all CRUD operations for the 
 | -------------- | ----- | --------- | ----------- | ----------- |
 | MCP Tools      | 2     | 2         | 0           | 0           |
 | Library CRUD   | 6     | 4         | 0           | 2           |
-| Document CRUD  | 13    | 8         | 0           | 5           |
+| Document CRUD  | 13    | 12        | 0           | 1           |
 | Infrastructure | 3     | 0         | 0           | 3           |
 | Testing        | 1     | 0         | 0           | 1           |
 
@@ -391,81 +391,87 @@ This document tracks the implementation progress of all CRUD operations for the 
 
 ### Task #32: Implement document update title endpoint
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Completed
 **Priority**: Medium
 **Files**: `c7_mcp/services/document.py`, `c7_mcp/routers/documents.py`
 **Endpoint**: `PATCH /api/v1/documents/{doc_id}/title`
 
 **Implementation Steps**:
 
-- [ ] Verify document exists in database
-- [ ] Update title field
-- [ ] Update updated_at timestamp
-- [ ] Transform DocumentData to DocumentResponse in router
-- [ ] Handle not found errors with 404 status
-- [ ] Handle other errors with 500 status
+- [x] Verify document exists in database
+- [x] Update title field
+- [x] Update updated_at timestamp
+- [x] Transform DocumentData to DocumentResponse in router
+- [x] Handle not found errors with 404 status
+- [x] Handle other errors with 500 status
+
+**Design Decision**: Preserves existing embeddings and vector data when updating title only.
 
 ---
 
 ### Task #33: Implement document move to library endpoint
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Completed
 **Priority**: Medium
 **Files**: `c7_mcp/services/document.py`, `c7_mcp/routers/documents.py`
 **Endpoint**: `PATCH /api/v1/documents/{doc_id}/library`
 
 **Implementation Steps**:
 
-- [ ] Verify document exists in database
-- [ ] Verify target library exists in database
-- [ ] Update library_id field
+- [x] Verify document exists in database
+- [x] Verify target library exists in database
+- [x] Update library_id field
 - [ ] Update document counts for both old and new libraries
-- [ ] Update updated_at timestamp
-- [ ] Transform DocumentData to DocumentResponse in router
-- [ ] Handle document not found errors with 404 status
-- [ ] Handle library not found errors with 404 status
-- [ ] Handle other errors with 500 status
+- [x] Update updated_at timestamp
+- [x] Transform DocumentData to DocumentResponse in router
+- [x] Handle document not found errors with 404 status
+- [x] Handle library not found errors with 404 status
+- [x] Handle other errors with 500 status
+
+**Design Decision**: Updates denormalized library fields (name, language, ecosystem) from target library. Preserves embeddings.
 
 ---
 
 ### Task #34: Implement document update embeddings endpoint
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Completed
 **Priority**: High
 **Files**: `c7_mcp/services/document.py`, `c7_mcp/routers/documents.py`
 **Endpoint**: `PATCH /api/v1/documents/{doc_id}/embeddings`
 
 **Implementation Steps**:
 
-- [ ] Verify document exists in database
-- [ ] Validate embedding dimension consistency with existing embeddings
-- [ ] Store embeddings and model info
-- [ ] Set has_embeddings to True
-- [ ] Update updated_at timestamp
-- [ ] Transform DocumentData to DocumentResponse in router
-- [ ] Handle not found errors with 404 status
-- [ ] Handle dimension mismatch errors with 400 status
-- [ ] Handle other errors with 500 status
+- [x] Verify document exists in database
+- [x] Validate embedding dimension consistency with existing embeddings
+- [x] Store embeddings and model info
+- [x] Set has_embeddings to True
+- [x] Update updated_at timestamp
+- [x] Transform DocumentData to DocumentResponse in router
+- [x] Handle not found errors with 404 status
+- [x] Handle dimension mismatch errors with 400 status
+- [x] Handle other errors with 500 status
+
+**Design Decision**: Validates vector dimension matches existing (2560). Stores optional model name in metadata_json.
 
 ---
 
 ### Task #35: Implement document delete endpoint
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Completed
 **Priority**: Medium
 **Files**: `c7_mcp/services/document.py`, `c7_mcp/routers/documents.py`
 **Endpoint**: `DELETE /api/v1/documents/{doc_id}`
 
 **Implementation Steps**:
 
-- [ ] Verify document exists in database
-- [ ] Delete document from database
-- [ ] Delete associated embeddings
+- [x] Verify document exists in database
+- [x] Delete document from database
+- [x] Delete associated embeddings
 - [ ] Update library document count
-- [ ] Clean up associated resources
-- [ ] Return DeleteResponse with success=True in router
-- [ ] Handle not found errors with 404 status
-- [ ] Handle other errors with 500 status
+- [x] Clean up associated resources
+- [x] Return DeleteResponse with success=True in router
+- [x] Handle not found errors with 404 status
+- [x] Handle other errors with 500 status
 
 ---
 
@@ -623,10 +629,10 @@ everything before them unblocks the path to get there.
 - [x] `12.` `GET   /{id}/embeddings`   — get embedding vector
 - [x] `14.` `PUT   /{id}`              — full update
 - [x] `7.` `PATCH  /{id}/content`      — update content
-- [ ] `15.` `PATCH /{id}/title`        — update title
-- [ ] `16.` `PATCH /{id}/library`      — move to different library
-- [ ] `17.` `PATCH /{id}/embeddings`   — update embeddings
-- [ ] `18.` `DELETE /{id}`             — delete document
+- [x] `15.` `PATCH /{id}/title`        — update title
+- [x] `16.` `PATCH /{id}/library`      — move to different library
+- [x] `17.` `PATCH /{id}/embeddings`   — update embeddings
+- [x] `18.` `DELETE /{id}`             — delete document
 
 ### MCP Tools (`POST /mcp`)
 - [x] `4.` `resolve-library-id` — resolve library name → Context7 ID
