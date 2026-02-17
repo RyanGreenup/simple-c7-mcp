@@ -4,6 +4,7 @@ This module implements the Context7-compatible MCP endpoint using JSON-RPC 2.0 p
 """
 
 from fastapi import APIRouter, HTTPException
+from pydantic import ValidationError
 
 from c7_mcp.schemas.mcp import (
     JSONRPCRequest,
@@ -16,6 +17,14 @@ from c7_mcp.schemas.mcp import (
 from c7_mcp.services import mcp as mcp_service
 
 router = APIRouter()
+
+
+def _validate_tool_args(model: type, arguments: dict) -> object:
+    """Validate tool arguments and map schema errors to HTTP 422."""
+    try:
+        return model.model_validate(arguments)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors()) from exc
 
 
 @router.post("/mcp", response_model=JSONRPCResponse)
@@ -49,11 +58,11 @@ async def mcp_endpoint(request: JSONRPCRequest) -> JSONRPCResponse:
     tool_name = request.params.name
 
     if tool_name == "resolve-library-id":
-        args = ResolveLibraryIdArgs.model_validate(request.params.arguments)
+        args = _validate_tool_args(ResolveLibraryIdArgs, request.params.arguments)
         result_text = mcp_service.resolve_library_id(args.library_name, args.query)
 
     elif tool_name == "query-docs":
-        args = QueryDocsArgs.model_validate(request.params.arguments)
+        args = _validate_tool_args(QueryDocsArgs, request.params.arguments)
         result_text = mcp_service.query_docs(args.library_id, args.query)
 
     else:
