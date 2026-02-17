@@ -28,9 +28,17 @@ test-mcp port="8000":
 test-integration-full port="8000":
     uv run python tests/test_integration.py --base-url http://localhost:{{ port }} --include-fetch
 
-# Start the FastAPI server
+# Start the FastAPI server in development mode (localhost + auto-reload)
 serve port="8000":
-    uv run c7-mcp serve --port {{ port }} --reload
+    uv run c7-mcp serve --host 127.0.0.1 --port {{ port }} --reload
+
+# Explicit development server alias
+serve-dev port="8000":
+    uv run c7-mcp serve --host 127.0.0.1 --port {{ port }} --reload
+
+# Start a production-oriented server (bind all interfaces, no reload, configurable workers)
+serve-prod host="0.0.0.0" port="8000" workers="4":
+    uv run c7-mcp serve --host {{ host }} --port {{ port }} --workers {{ workers }}
 
 # Check the health endpoint
 health port="8000":
@@ -519,6 +527,126 @@ fetch-vue-router port="8000":
 
 fetch-daisyui port="8000":
     just fetch-doc "daisyui" "How to use button and card components in DaisyUI" {{ port }}
+
+# ============================================================================
+# Collection Seeding Commands
+# ============================================================================
+
+# Seed the document collection with the default required libraries.
+seed-docs port="8000":
+    just seed-docs-group "required" "" {{ port }}
+
+# Seed a library group by fetching docs from Context7 and uploading to this server.
+seed-docs-group group="required" query="" port="8000":
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+
+    target_group = "{{ group }}"
+    query_override = "{{ query }}".strip()
+    api_port = "{{ port }}"
+
+    groups = {
+        "required": [
+            "solidstart",
+            "fastapi",
+            "react",
+            "vue",
+            "vue-router",
+            "daisyui",
+            "clickhouse",
+            "lancedb",
+        ],
+        "frontend": [
+            "solidstart",
+            "react",
+            "vue",
+            "vue-router",
+            "daisyui",
+        ],
+        "backend": [
+            "fastapi",
+            "pydantic",
+            "typer",
+        ],
+        "data": [
+            "clickhouse",
+            "duckdb",
+            "lancedb",
+            "pgvector",
+        ],
+    }
+
+    library_queries = {
+        "solidstart": "How to throw a redirect in SolidStart",
+        "fastapi": "How to create a REST API with authentication using FastAPI",
+        "react": "How to use useState and useEffect hooks in React",
+        "vue": "Vue 3 Composition API and reactive state management",
+        "vue-router": "How to define and configure routes in Vue Router",
+        "daisyui": "How to use button and card components in DaisyUI",
+        "clickhouse": "ClickHouse SQL reference and table engine documentation",
+        "duckdb": "DuckDB SQL analytics with local files and parquet datasets",
+        "lancedb": "LanceDB vector search and document embedding workflows",
+        "pgvector": "pgvector extension for vector similarity in PostgreSQL",
+        "pydantic": "Pydantic model validation and settings management",
+        "typer": "Typer CLI commands, arguments, and options",
+    }
+
+    if target_group == "all":
+        seen = set()
+        libraries = []
+        for libs in groups.values():
+            for library in libs:
+                if library not in seen:
+                    seen.add(library)
+                    libraries.append(library)
+    else:
+        libraries = groups.get(target_group)
+        if libraries is None:
+            print(f"❌ Unknown group: {target_group}")
+            print("Valid groups: required, frontend, backend, data, all")
+            sys.exit(1)
+
+    print(f"🌱 Seeding group '{target_group}' into server on port {api_port}")
+    print(f"📚 Libraries: {len(libraries)}")
+    print()
+
+    success = []
+    failed = []
+
+    for i, library in enumerate(libraries, 1):
+        query = query_override or library_queries.get(
+            library, f"{library} official documentation API reference"
+        )
+        print(f"[{i}/{len(libraries)}] Fetching {library}")
+        print(f"    Query: {query}")
+        try:
+            result = subprocess.run(
+                ["just", "fetch-doc", library, query, api_port],
+                timeout=240,
+            )
+            if result.returncode == 0:
+                success.append(library)
+            else:
+                failed.append(library)
+        except subprocess.TimeoutExpired:
+            print("    ❌ Timed out")
+            failed.append(library)
+        except Exception as exc:
+            print(f"    ❌ Error: {exc}")
+            failed.append(library)
+        print()
+
+    print("📊 Seed summary")
+    print(f"   ✅ Success: {len(success)}")
+    print(f"   ❌ Failed: {len(failed)}")
+
+    if failed:
+        print("   Failed libraries:")
+        for library in failed:
+            print(f"   - {library}")
+
+    sys.exit(0 if not failed else 1)
 
 # ============================================================================
 # Database Inspection Commands

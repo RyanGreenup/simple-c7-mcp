@@ -70,6 +70,18 @@ codex mcp get simple-c7-mcp
 - "Query docs for `/npm/react` and summarize key points about effects."
 - "Find authentication examples in FastAPI docs."
 
+### Prompts to trigger fetch-library-docs
+
+Use explicit wording when you want remote fetch behavior:
+- "If `X` is not in our local library DB, fetch it from Context7 and ingest docs now."
+- "Check local libraries for `X`; only if missing, run fetch-library-docs with `fetchIfMissing: true`."
+- "Do not fetch unless missing: try local first, then fetch `X` from Context7 if needed."
+
+Examples:
+- "If `lancedb` is missing locally, fetch it from Context7 and ingest it."
+- "Check for `auth.js` locally; if it isn't present, fetch via MCP with `fetchIfMissing: true` and then query login callback docs."
+- "Try local docs for `solid-start`; only fetch from Context7 if not found."
+
 ### Is "search docs" a special command?
 
 No. `search docs` is plain natural language, not a reserved Codex keyword. Codex decides whether to call MCP/tools based on your request and configured tools.
@@ -185,6 +197,17 @@ claude mcp get simple-c7-mcp
 - "Resolve the library ID for React and query docs for useEffect cleanup."
 - "Query docs for `/npm/react` and summarize effect lifecycle guidance."
 - "Find authentication examples in FastAPI docs."
+
+### Prompts to trigger fetch-library-docs
+
+Use explicit wording so the tool can fetch only when missing:
+- "If `X` is not in our local library DB, fetch it from Context7 and ingest docs now."
+- "Check local first; only if missing, run fetch-library-docs with `fetchIfMissing: true`."
+- "Do not fetch unless missing: use local docs if present."
+
+Examples:
+- "If `pgvector` is missing locally, fetch and ingest from Context7, then summarize index setup."
+- "Check `nuxt` locally; if absent, fetch with `fetchIfMissing: true` and find routing docs."
 
 ### Quick connectivity check
 
