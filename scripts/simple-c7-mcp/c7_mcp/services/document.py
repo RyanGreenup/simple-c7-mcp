@@ -7,6 +7,15 @@ including content management and embeddings.
 from datetime import datetime
 from typing import TypedDict
 
+from c7_mcp.exceptions import (
+    C7Error,
+    DocumentNotFoundError,
+    EmbeddingDimensionError,
+    EmbeddingsNotFoundError,
+    LibraryNotFoundError,
+    URLFetchError,
+)
+
 
 class DocumentData(TypedDict):
     """Document data structure.
@@ -128,7 +137,7 @@ def create_document(title: str, content: str, library_id: str) -> DocumentData:
     )
 
     if not existing_lib:
-        raise ValueError(f"Library with ID '{library_id}' not found")
+        raise LibraryNotFoundError(library_id)
 
     library = existing_lib[0]
 
@@ -210,7 +219,7 @@ def fetch_document(title: str, url: str, library_id: str) -> DocumentData:
         .to_list()
     )
     if not existing_lib:
-        raise ValueError(f"Library with ID '{library_id}' not found")
+        raise LibraryNotFoundError(library_id)
 
     library = existing_lib[0]
 
@@ -220,8 +229,10 @@ def fetch_document(title: str, url: str, library_id: str) -> DocumentData:
         with urllib.request.urlopen(req, timeout=30) as response:
             content = response.read().decode("utf-8", errors="replace")
             content_type = response.headers.get("Content-Type", "")
+    except C7Error:
+        raise
     except Exception as e:
-        raise ValueError(f"Failed to fetch URL '{url}': {e}")
+        raise URLFetchError(url, str(e))
 
     # 3. Determine source_type from Content-Type or URL extension
     if "html" in content_type:
@@ -294,7 +305,7 @@ def get_document(doc_id: str) -> DocumentData:
         .to_list()
     )
     if not results:
-        raise ValueError(f"Document '{doc_id}' not found")
+        raise DocumentNotFoundError(doc_id)
     chunk = results[0]
     metadata = json.loads(chunk.get("metadata_json", "{}"))
     return {
@@ -347,13 +358,13 @@ def get_embeddings(doc_id: str) -> EmbeddingData:
         .to_list()
     )
     if not results:
-        raise ValueError(f"Document '{doc_id}' not found")
+        raise DocumentNotFoundError(doc_id)
 
     chunk = results[0]
     metadata = json.loads(chunk.get("metadata_json", "{}"))
 
     if not metadata.get("has_real_embeddings", False):
-        raise ValueError(f"Document '{doc_id}' has no embeddings")
+        raise EmbeddingsNotFoundError(doc_id)
 
     vector = chunk.get("vector", [])
     return {
@@ -393,7 +404,7 @@ def update_content(doc_id: str, content: str) -> DocumentData:
         .to_list()
     )
     if not results:
-        raise ValueError(f"Document '{doc_id}' not found")
+        raise DocumentNotFoundError(doc_id)
 
     # 2. Preserve metadata from first chunk
     first_chunk = results[0]
@@ -470,7 +481,7 @@ def full_update_document(
         .to_list()
     )
     if not results:
-        raise ValueError(f"Document '{doc_id}' not found")
+        raise DocumentNotFoundError(doc_id)
 
     first_chunk = results[0]
     original_created_at = first_chunk["created_at"]
@@ -484,7 +495,7 @@ def full_update_document(
         .to_list()
     )
     if not lib_results:
-        raise ValueError(f"Library with ID '{library_id}' not found")
+        raise LibraryNotFoundError(library_id)
 
     library = lib_results[0]
 
@@ -553,7 +564,7 @@ def update_title(doc_id: str, title: str) -> DocumentData:
         .to_list()
     )
     if not results:
-        raise ValueError(f"Document '{doc_id}' not found")
+        raise DocumentNotFoundError(doc_id)
 
     first_chunk = results[0]
     original_created_at = first_chunk["created_at"]
@@ -623,7 +634,7 @@ def update_library(doc_id: str, library_id: str) -> DocumentData:
         .to_list()
     )
     if not results:
-        raise ValueError(f"Document '{doc_id}' not found")
+        raise DocumentNotFoundError(doc_id)
 
     first_chunk = results[0]
     original_created_at = first_chunk["created_at"]
@@ -639,7 +650,7 @@ def update_library(doc_id: str, library_id: str) -> DocumentData:
         .to_list()
     )
     if not lib_results:
-        raise ValueError(f"Library with ID '{library_id}' not found")
+        raise LibraryNotFoundError(library_id)
 
     library = lib_results[0]
 
@@ -709,7 +720,7 @@ def update_embeddings(
         .to_list()
     )
     if not results:
-        raise ValueError(f"Document '{doc_id}' not found")
+        raise DocumentNotFoundError(doc_id)
 
     first_chunk = results[0]
     original_created_at = first_chunk["created_at"]
@@ -717,10 +728,7 @@ def update_embeddings(
     # Validate dimension (must match configured vector size of 2560)
     expected_dim = len(first_chunk["vector"])
     if len(embeddings) != expected_dim:
-        raise ValueError(
-            f"Embedding dimension mismatch: got {len(embeddings)}, "
-            f"expected {expected_dim}"
-        )
+        raise EmbeddingDimensionError(len(embeddings), expected_dim)
 
     documents.delete(f"document_id = '{doc_id}'")
 
@@ -783,7 +791,7 @@ def delete_document(doc_id: str) -> bool:
         .to_list()
     )
     if not results:
-        raise ValueError(f"Document '{doc_id}' not found")
+        raise DocumentNotFoundError(doc_id)
 
     # Delete all chunks for this document
     documents.delete(f"document_id = '{doc_id}'")

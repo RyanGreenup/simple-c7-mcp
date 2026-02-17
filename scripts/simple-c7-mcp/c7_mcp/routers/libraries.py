@@ -5,6 +5,7 @@ This module implements RESTful CRUD endpoints for library management.
 
 from fastapi import APIRouter, HTTPException
 
+from c7_mcp.exceptions import C7Error
 from c7_mcp.schemas.library import (
     DeleteResponse,
     LibraryCreate,
@@ -28,14 +29,11 @@ async def list_libraries() -> list[LibraryResponse]:
         HTTPException: 500 if internal server error.
     """
     try:
-        # Call service function
         libraries = library_service.list_libraries()
-
-        # Transform LibraryData to LibraryResponse
         return [LibraryResponse(**lib) for lib in libraries]
-
+    except C7Error:
+        raise
     except Exception as e:
-        # Handle unexpected errors
         raise HTTPException(
             status_code=500, detail=f"Failed to list libraries: {str(e)}"
         )
@@ -56,7 +54,7 @@ async def create_library(library: LibraryCreate) -> LibraryResponse:
         Created library with full metadata.
 
     Raises:
-        HTTPException: 400 if library name already exists in ecosystem.
+        HTTPException: 409 if library name already exists in ecosystem.
         HTTPException: 500 if database error occurs.
 
     Example:
@@ -70,7 +68,6 @@ async def create_library(library: LibraryCreate) -> LibraryResponse:
         >>> }
     """
     try:
-        # Call service layer
         library_data = library_service.create_library(
             name=library.name,
             language=library.language,
@@ -87,15 +84,10 @@ async def create_library(library: LibraryCreate) -> LibraryResponse:
             author=library.author,
             license=library.license,
         )
-
-        # Transform to response model
         return LibraryResponse(**library_data)
-
-    except ValueError as e:
-        # Handle duplicate name or validation errors
-        raise HTTPException(status_code=400, detail=str(e))
+    except C7Error:
+        raise
     except Exception as e:
-        # Handle unexpected errors
         raise HTTPException(
             status_code=500, detail=f"Failed to create library: {str(e)}"
         )
@@ -113,16 +105,16 @@ async def get_library(library_id: str) -> LibraryResponse:
 
     Raises:
         HTTPException: 404 if library not found.
-        HTTPException: 501 if not implemented yet.
-
     """
     try:
         data = library_service.get_library(library_id)
         return LibraryResponse(**data)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except C7Error:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get library: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get library: {str(e)}"
+        )
 
 
 @router.put("/{library_id}", response_model=LibraryResponse)
@@ -140,9 +132,7 @@ async def update_library(
 
     Raises:
         HTTPException: 404 if library not found.
-        HTTPException: 400 if new name already exists.
-        HTTPException: 501 if not implemented yet.
-
+        HTTPException: 409 if new name already exists.
     """
     try:
         data = library_service.update_library(
@@ -151,14 +141,8 @@ async def update_library(
             description=library.description or "",
         )
         return LibraryResponse(**data)
-
-    except ValueError as e:
-        error_msg = str(e)
-        if "not found" in error_msg.lower():
-            raise HTTPException(status_code=404, detail=error_msg)
-        else:
-            raise HTTPException(status_code=400, detail=error_msg)
-
+    except C7Error:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to update library: {str(e)}"
@@ -180,9 +164,7 @@ async def partial_update_library(
 
     Raises:
         HTTPException: 404 if library not found.
-        HTTPException: 400 if new name already exists.
-        HTTPException: 501 if not implemented yet.
-
+        HTTPException: 409 if new name already exists.
     """
     try:
         data = library_service.partial_update_library(
@@ -191,14 +173,8 @@ async def partial_update_library(
             description=library.description,
         )
         return LibraryResponse(**data)
-
-    except ValueError as e:
-        error_msg = str(e)
-        if "not found" in error_msg.lower():
-            raise HTTPException(status_code=404, detail=error_msg)
-        else:
-            raise HTTPException(status_code=400, detail=error_msg)
-
+    except C7Error:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to update library: {str(e)}"
@@ -217,23 +193,15 @@ async def delete_library(library_id: str) -> DeleteResponse:
 
     Raises:
         HTTPException: 404 if library not found.
-        HTTPException: 400 if library has documents (decide on cascade behavior).
-        HTTPException: 501 if not implemented yet.
-
+        HTTPException: 400 if library has documents.
     """
     try:
         library_service.delete_library(library_id)
         return DeleteResponse(
             success=True, message=f"Library '{library_id}' deleted successfully"
         )
-
-    except ValueError as e:
-        error_msg = str(e)
-        if "not found" in error_msg.lower():
-            raise HTTPException(status_code=404, detail=error_msg)
-        else:
-            raise HTTPException(status_code=400, detail=error_msg)
-
+    except C7Error:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to delete library: {str(e)}"

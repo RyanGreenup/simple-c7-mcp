@@ -9,6 +9,7 @@ from pathlib import Path
 
 import lancedb
 
+from c7_mcp.exceptions import DatabaseError
 from c7_mcp.models import Document, Library
 
 # Default database path
@@ -93,7 +94,7 @@ def get_libraries_table():
     db = get_db()
 
     if "libraries" not in db.table_names():
-        raise ValueError(
+        raise DatabaseError(
             "Libraries table does not exist. Run init_schema() first."
         )
 
@@ -112,7 +113,7 @@ def get_documents_table():
     db = get_db()
 
     if "documents" not in db.table_names():
-        raise ValueError(
+        raise DatabaseError(
             "Documents table does not exist. Run init_schema() first."
         )
 

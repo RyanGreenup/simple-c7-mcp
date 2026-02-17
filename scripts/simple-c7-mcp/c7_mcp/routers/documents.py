@@ -6,6 +6,7 @@ including content upload, URL fetching, and various update operations.
 
 from fastapi import APIRouter, HTTPException, Query
 
+from c7_mcp.exceptions import C7Error
 from c7_mcp.schemas.document import (
     ContentUpdate,
     DocumentContent,
@@ -46,12 +47,9 @@ async def list_documents(
         HTTPException: 500 if internal server error.
     """
     try:
-        # Call service function
         documents = document_service.list_documents(
             library_id=library_id, limit=limit, offset=offset
         )
-
-        # Transform DocumentData to DocumentResponse (exclude content)
         return [
             DocumentResponse(
                 id=doc["id"],
@@ -63,9 +61,9 @@ async def list_documents(
             )
             for doc in documents
         ]
-
+    except C7Error:
+        raise
     except Exception as e:
-        # Handle unexpected errors
         raise HTTPException(
             status_code=500, detail=f"Failed to list documents: {str(e)}"
         )
@@ -86,14 +84,11 @@ async def create_document(document: DocumentCreate) -> DocumentResponse:
         HTTPException: 500 if internal server error.
     """
     try:
-        # Call service function
         data = document_service.create_document(
             title=document.title,
             content=document.content,
             library_id=document.library_id,
         )
-
-        # Transform DocumentData to DocumentResponse (exclude content field)
         return DocumentResponse(
             id=data["id"],
             title=data["title"],
@@ -102,17 +97,9 @@ async def create_document(document: DocumentCreate) -> DocumentResponse:
             updated_at=data["updated_at"],
             has_embeddings=data["has_embeddings"],
         )
-
-    except ValueError as e:
-        # Handle library not found
-        error_msg = str(e)
-        if "not found" in error_msg.lower():
-            raise HTTPException(status_code=404, detail=error_msg)
-        else:
-            raise HTTPException(status_code=400, detail=error_msg)
-
+    except C7Error:
+        raise
     except Exception as e:
-        # Handle unexpected errors
         raise HTTPException(
             status_code=500, detail=f"Failed to create document: {str(e)}"
         )
@@ -131,8 +118,6 @@ async def fetch_document(document: DocumentFetch) -> DocumentResponse:
     Raises:
         HTTPException: 404 if library not found.
         HTTPException: 400 if URL fetch fails.
-        HTTPException: 501 if not implemented yet.
-
     """
     try:
         data = document_service.fetch_document(
@@ -140,7 +125,6 @@ async def fetch_document(document: DocumentFetch) -> DocumentResponse:
             url=str(document.url),
             library_id=document.library_id,
         )
-
         return DocumentResponse(
             id=data["id"],
             title=data["title"],
@@ -149,14 +133,8 @@ async def fetch_document(document: DocumentFetch) -> DocumentResponse:
             updated_at=data["updated_at"],
             has_embeddings=data["has_embeddings"],
         )
-
-    except ValueError as e:
-        error_msg = str(e)
-        if "not found" in error_msg.lower():
-            raise HTTPException(status_code=404, detail=error_msg)
-        else:
-            raise HTTPException(status_code=400, detail=error_msg)
-
+    except C7Error:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to fetch document: {str(e)}"
@@ -175,8 +153,6 @@ async def get_document(doc_id: str) -> DocumentResponse:
 
     Raises:
         HTTPException: 404 if document not found.
-        HTTPException: 501 if not implemented yet.
-
     """
     try:
         data = document_service.get_document(doc_id)
@@ -188,10 +164,12 @@ async def get_document(doc_id: str) -> DocumentResponse:
             updated_at=data["updated_at"],
             has_embeddings=data["has_embeddings"],
         )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except C7Error:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get document: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get document: {str(e)}"
+        )
 
 
 @router.get("/{doc_id}/content", response_model=DocumentContent)
@@ -210,10 +188,12 @@ async def get_document_content(doc_id: str) -> DocumentContent:
     try:
         content = document_service.get_content(doc_id)
         return DocumentContent(content=content)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except C7Error:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get content: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get content: {str(e)}"
+        )
 
 
 @router.get("/{doc_id}/pretty", response_model=DocumentPretty)
@@ -228,16 +208,12 @@ async def get_document_pretty(doc_id: str) -> DocumentPretty:
 
     Raises:
         HTTPException: 404 if document not found.
-        HTTPException: 501 if not implemented yet.
-
     """
     try:
         data = document_service.get_document(doc_id)
         return DocumentPretty(title=data["title"], content=data["content"])
-
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
+    except C7Error:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to get document: {str(e)}"
@@ -256,16 +232,12 @@ async def get_document_title(doc_id: str) -> DocumentTitle:
 
     Raises:
         HTTPException: 404 if document not found.
-        HTTPException: 501 if not implemented yet.
-
     """
     try:
         data = document_service.get_document(doc_id)
         return DocumentTitle(title=data["title"])
-
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
+    except C7Error:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to get title: {str(e)}"
@@ -284,8 +256,6 @@ async def get_document_embeddings(doc_id: str) -> DocumentEmbeddings:
 
     Raises:
         HTTPException: 404 if document not found or has no embeddings.
-        HTTPException: 501 if not implemented yet.
-
     """
     try:
         data = document_service.get_embeddings(doc_id)
@@ -294,10 +264,8 @@ async def get_document_embeddings(doc_id: str) -> DocumentEmbeddings:
             dimension=data["dimension"],
             model=data["model"],
         )
-
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
+    except C7Error:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to get embeddings: {str(e)}"
@@ -316,10 +284,7 @@ async def update_document(doc_id: str, document: DocumentUpdate) -> DocumentResp
         Updated document metadata.
 
     Raises:
-        HTTPException: 404 if document not found.
-        HTTPException: 404 if target library not found.
-        HTTPException: 501 if not implemented yet.
-
+        HTTPException: 404 if document or target library not found.
     """
     try:
         data = document_service.full_update_document(
@@ -328,7 +293,6 @@ async def update_document(doc_id: str, document: DocumentUpdate) -> DocumentResp
             content=document.content,
             library_id=document.library_id,
         )
-
         return DocumentResponse(
             id=data["id"],
             title=data["title"],
@@ -337,14 +301,8 @@ async def update_document(doc_id: str, document: DocumentUpdate) -> DocumentResp
             updated_at=data["updated_at"],
             has_embeddings=data["has_embeddings"],
         )
-
-    except ValueError as e:
-        error_msg = str(e)
-        if "not found" in error_msg.lower():
-            raise HTTPException(status_code=404, detail=error_msg)
-        else:
-            raise HTTPException(status_code=400, detail=error_msg)
-
+    except C7Error:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to update document: {str(e)}"
@@ -366,12 +324,9 @@ async def update_document_content(
 
     Raises:
         HTTPException: 404 if document not found.
-        HTTPException: 501 if not implemented yet.
-
     """
     try:
         data = document_service.update_content(doc_id, content_update.content)
-
         return DocumentResponse(
             id=data["id"],
             title=data["title"],
@@ -380,10 +335,8 @@ async def update_document_content(
             updated_at=data["updated_at"],
             has_embeddings=data["has_embeddings"],
         )
-
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
+    except C7Error:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to update content: {str(e)}"
@@ -405,12 +358,9 @@ async def update_document_title(
 
     Raises:
         HTTPException: 404 if document not found.
-        HTTPException: 501 if not implemented yet.
-
     """
     try:
         data = document_service.update_title(doc_id, title_update.title)
-
         return DocumentResponse(
             id=data["id"],
             title=data["title"],
@@ -419,10 +369,8 @@ async def update_document_title(
             updated_at=data["updated_at"],
             has_embeddings=data["has_embeddings"],
         )
-
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
+    except C7Error:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to update title: {str(e)}"
@@ -444,14 +392,11 @@ async def update_document_library(
 
     Raises:
         HTTPException: 404 if document or target library not found.
-        HTTPException: 501 if not implemented yet.
-
     """
     try:
         data = document_service.update_library(
             doc_id, library_assignment.library_id
         )
-
         return DocumentResponse(
             id=data["id"],
             title=data["title"],
@@ -460,14 +405,8 @@ async def update_document_library(
             updated_at=data["updated_at"],
             has_embeddings=data["has_embeddings"],
         )
-
-    except ValueError as e:
-        error_msg = str(e)
-        if "not found" in error_msg.lower():
-            raise HTTPException(status_code=404, detail=error_msg)
-        else:
-            raise HTTPException(status_code=400, detail=error_msg)
-
+    except C7Error:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to move document: {str(e)}"
@@ -490,8 +429,6 @@ async def update_document_embeddings(
     Raises:
         HTTPException: 404 if document not found.
         HTTPException: 400 if embedding dimension inconsistent.
-        HTTPException: 501 if not implemented yet.
-
     """
     try:
         data = document_service.update_embeddings(
@@ -499,7 +436,6 @@ async def update_document_embeddings(
             embeddings_update.embeddings,
             model=embeddings_update.model,
         )
-
         return DocumentResponse(
             id=data["id"],
             title=data["title"],
@@ -508,16 +444,8 @@ async def update_document_embeddings(
             updated_at=data["updated_at"],
             has_embeddings=data["has_embeddings"],
         )
-
-    except ValueError as e:
-        error_msg = str(e)
-        if "not found" in error_msg.lower():
-            raise HTTPException(status_code=404, detail=error_msg)
-        elif "dimension" in error_msg.lower():
-            raise HTTPException(status_code=400, detail=error_msg)
-        else:
-            raise HTTPException(status_code=400, detail=error_msg)
-
+    except C7Error:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to update embeddings: {str(e)}"
@@ -536,18 +464,14 @@ async def delete_document(doc_id: str) -> DeleteResponse:
 
     Raises:
         HTTPException: 404 if document not found.
-        HTTPException: 501 if not implemented yet.
-
     """
     try:
         document_service.delete_document(doc_id)
         return DeleteResponse(
             success=True, message=f"Document '{doc_id}' deleted successfully"
         )
-
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
+    except C7Error:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to delete document: {str(e)}"

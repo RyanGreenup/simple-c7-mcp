@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import TypedDict
 
 from c7_mcp.db import get_libraries_table
+from c7_mcp.exceptions import ConstraintError, LibraryExistsError, LibraryNotFoundError
 
 
 class LibraryData(TypedDict):
@@ -147,9 +148,7 @@ def create_library(
     )
 
     if existing:
-        raise ValueError(
-            f"Library '{name}' already exists in ecosystem '{ecosystem}'"
-        )
+        raise LibraryExistsError(name, ecosystem)
 
     # 2. Generate unique ID
     unique_suffix = str(uuid.uuid4())[:8]
@@ -245,7 +244,7 @@ def get_library(library_id: str) -> LibraryData:
         .to_list()
     )
     if not results:
-        raise ValueError(f"Library '{library_id}' not found")
+        raise LibraryNotFoundError(library_id)
     lib = results[0]
     return {
         "id": lib["id"],
@@ -299,7 +298,7 @@ def update_library(
         .to_list()
     )
     if not existing:
-        raise ValueError(f"Library '{library_id}' not found")
+        raise LibraryNotFoundError(library_id)
 
     lib = existing[0]
 
@@ -315,9 +314,7 @@ def update_library(
             .to_list()
         )
         if duplicates:
-            raise ValueError(
-                f"Library '{name}' already exists in ecosystem '{lib['ecosystem']}'"
-            )
+            raise LibraryExistsError(name, lib["ecosystem"])
 
     # 3. Delete and re-add with updated fields
     libraries.delete(f"id = '{library_id}'")
@@ -413,7 +410,7 @@ def partial_update_library(
         .to_list()
     )
     if not existing:
-        raise ValueError(f"Library '{library_id}' not found")
+        raise LibraryNotFoundError(library_id)
 
     lib = existing[0]
 
@@ -433,9 +430,7 @@ def partial_update_library(
             .to_list()
         )
         if duplicates:
-            raise ValueError(
-                f"Library '{name}' already exists in ecosystem '{lib['ecosystem']}'"
-            )
+            raise LibraryExistsError(name, lib["ecosystem"])
 
     # 4. Delete and re-add with updated fields
     libraries.delete(f"id = '{library_id}'")
@@ -527,7 +522,7 @@ def delete_library(library_id: str) -> bool:
         .to_list()
     )
     if not existing:
-        raise ValueError(f"Library '{library_id}' not found")
+        raise LibraryNotFoundError(library_id)
 
     # 2. Check for associated documents
     documents = get_documents_table()
@@ -538,7 +533,7 @@ def delete_library(library_id: str) -> bool:
         .to_list()
     )
     if doc_results:
-        raise ValueError(
+        raise ConstraintError(
             f"Library '{library_id}' has associated documents. "
             "Delete all documents first."
         )
