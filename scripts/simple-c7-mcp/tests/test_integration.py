@@ -364,8 +364,24 @@ def test_documents(client: httpx.Client, library_id: str | None) -> tuple[Suite,
     return suite, created_doc_id
 
 
-def test_document_fetch(client: httpx.Client, library_id: str | None) -> Suite:
+def test_document_fetch(
+    client: httpx.Client,
+    library_id: str | None,
+    *,
+    run: bool = False,
+    timeout: float = 15.0,
+) -> Suite:
+    """Test POST /api/v1/documents/fetch.
+
+    Skipped by default because it makes outbound HTTP calls through the server;
+    pass run=True (--include-fetch) to execute these tests.
+    """
     suite = Suite("Document Fetch from URL")
+
+    if not run:
+        suite.add("POST /api/v1/documents/fetch (skipped — use --include-fetch)",
+                  Status.SKIP, "outbound network calls skipped by default")
+        return suite
 
     if not library_id:
         suite.add("POST /api/v1/documents/fetch", Status.SKIP, "no library_id available")
@@ -377,7 +393,7 @@ def test_document_fetch(client: httpx.Client, library_id: str | None) -> Suite:
              "title": "Example Domain",
              "library_id": _lib,
              "url": "https://example.com",
-         }, timeout=30.0), 201)
+         }, timeout=timeout), 201)
 
     # bad URL → 400 (or 501 if not implemented)
     call(suite, "POST /api/v1/documents/fetch bad URL → 400",
@@ -385,7 +401,7 @@ def test_document_fetch(client: httpx.Client, library_id: str | None) -> Suite:
              "title": "Bad",
              "library_id": _lib,
              "url": "https://this-domain-should-not-exist-xyz-abc-123.invalid/",
-         }, timeout=30.0), 400)
+         }, timeout=timeout), 400)
 
     return suite
 
@@ -501,7 +517,7 @@ def print_suite(suite: Suite, use_color: bool = True) -> None:
             print(line)
 
 
-def run_all(base_url: str) -> int:
+def run_all(base_url: str, *, include_fetch: bool = False) -> int:
     """Run all suites. Returns 0 on success (all pass or skip), 1 on failures, 2 on connection error."""
     use_color = sys.stdout.isatty()
 
@@ -511,7 +527,7 @@ def run_all(base_url: str) -> int:
 
     # Quick connectivity check before running anything
     try:
-        probe = httpx.get(f"{base_url}/health", timeout=5.0)
+        httpx.get(f"{base_url}/health", timeout=5.0)
     except httpx.ConnectError:
         print(f"\nERROR: Cannot connect to {base_url}")
         print("Is the server running? Try: just serve")
@@ -531,7 +547,7 @@ def run_all(base_url: str) -> int:
     doc_suite, doc_id = test_documents(client, library_id)
     all_suites.append(doc_suite)
 
-    all_suites.append(test_document_fetch(client, library_id))
+    all_suites.append(test_document_fetch(client, library_id, run=include_fetch))
     all_suites.append(test_mcp(client, library_id))
     all_suites.append(test_cleanup(client, doc_id, library_id))
 
@@ -566,10 +582,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Integration tests for Context7 MCP API")
     parser.add_argument(
         "--base-url", default=BASE_URL,
-        help=f"Base URL of the server (default: {BASE_URL})"
-    )
+        help=f"Base URL of the server (default: {BASE_URL})")
+    parser.add_argument(
+        "--include-fetch", action="store_true", default=False,
+        help="Run document-fetch tests (makes outbound HTTP calls; skipped by default)")
     args = parser.parse_args()
-    sys.exit(run_all(args.base_url))
+    sys.exit(run_all(args.base_url, include_fetch=args.include_fetch))
 
 
 if __name__ == "__main__":
