@@ -1,0 +1,9 @@
+[Unit]
+Description=Build C7 MCP Image
+
+[Build]
+ImageTag=localhost/c7-mcp:latest
+SetWorkingDirectory=file
+
+[Install]
+WantedBy=default.target

@@ -709,6 +709,43 @@ sql table="libraries" db_path="./lancedb_data":
 sql-docs db_path="./lancedb_data":
     just sql "documents" {{ db_path }}
 
+# ============================================================================
+# Volume Import/Export Commands
+# ============================================================================
+
+volume_name := "systemd-c7-mcp-data"
+container_uid := "65532"
+container_gid := "65532"
+
+# Export the podman volume to a tar archive
+export-volume file="systemd-c7-mcp-data.tar":
+    podman volume export -o {{ file }} {{ volume_name }}
+    @echo "Exported {{ volume_name }} to {{ file }}"
+
+# Import a tar archive into the podman volume (handles SELinux + non-root uid)
+import-volume file="systemd-c7-mcp-data.tar":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ ! -f "{{ file }}" ]; then
+        echo "File not found: {{ file }}"
+        exit 1
+    fi
+    # Create volume if missing
+    podman volume exists {{ volume_name }} 2>/dev/null || podman volume create {{ volume_name }}
+    # Import the tar
+    podman volume import {{ volume_name }} {{ file }}
+    # Fix ownership for the non-root container user
+    podman run --rm \
+        -v {{ volume_name }}:/data \
+        docker.io/library/busybox:latest \
+        chown -R {{ container_uid }}:{{ container_gid }} /data
+    # Relabel for SELinux if available
+    -@podman run --rm --security-opt label=disable \
+        -v {{ volume_name }}:/data:Z \
+        docker.io/library/busybox:latest \
+        true
+    @echo "Imported {{ file }} into {{ volume_name }}"
+
 # Clean the database (WARNING: deletes all data)
 clean-db:
     rm -rf lancedb_data

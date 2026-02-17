@@ -74,7 +74,11 @@ def send_initialize(client: httpx.Client) -> httpx.Response:
     """Send an MCP initialize request with proper transport headers."""
     return client.post(
         "/mcp",
-        json=jsonrpc("initialize", {"protocolVersion": MCP_PROTOCOL_VERSION}),
+        json=jsonrpc("initialize", {
+            "protocolVersion": MCP_PROTOCOL_VERSION,
+            "capabilities": {},
+            "clientInfo": {"name": "test-client", "version": "1.0.0"},
+        }),
         headers={
             "Accept": MCP_ACCEPT,
             "Content-Type": MCP_CONTENT_TYPE,
@@ -261,16 +265,19 @@ class TestGetSseStream:
         session_id = extract_session_id(init_r)
         assert session_id is not None
 
-        r = client.get(
+        # GET opens a long-lived SSE stream.  Use stream mode with a short
+        # read timeout so the test doesn't hang.
+        with client.stream(
+            "GET",
             "/mcp",
             headers={
                 "Accept": "text/event-stream",
                 "Mcp-Session-Id": session_id,
             },
-        )
-        # Should return 200 with SSE, not 405
-        assert r.status_code != 405, "GET /mcp must be supported (got 405)"
-        assert r.status_code == 200
+        ) as r:
+            # Should return 200 with SSE, not 405
+            assert r.status_code != 405, "GET /mcp must be supported (got 405)"
+            assert r.status_code == 200
 
     def test_get_returns_event_stream_content_type(
         self, client: httpx.Client
@@ -280,17 +287,18 @@ class TestGetSseStream:
         session_id = extract_session_id(init_r)
         assert session_id is not None
 
-        r = client.get(
+        with client.stream(
+            "GET",
             "/mcp",
             headers={
                 "Accept": "text/event-stream",
                 "Mcp-Session-Id": session_id,
             },
-        )
-        content_type = r.headers.get("content-type", "")
-        assert "text/event-stream" in content_type, (
-            f"GET /mcp should return text/event-stream, got: {content_type}"
-        )
+        ) as r:
+            content_type = r.headers.get("content-type", "")
+            assert "text/event-stream" in content_type, (
+                f"GET /mcp should return text/event-stream, got: {content_type}"
+            )
 
     def test_get_without_session_id_rejected(self, client: httpx.Client) -> None:
         """GET /mcp without Mcp-Session-Id should be rejected."""

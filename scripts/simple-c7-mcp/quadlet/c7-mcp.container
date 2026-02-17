@@ -1,0 +1,26 @@
+[Unit]
+Description=Context7 MCP API Server
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=localhost/c7-mcp:latest
+ContainerName=c7-mcp
+PublishPort=8000:8000
+Volume=c7-mcp-data:/app/lancedb_data
+Environment=LANCEDB_PATH=/app/lancedb_data
+Environment=NVIDIA_VISIBLE_DEVICES=all
+Environment=NVIDIA_DRIVER_CAPABILITIES=compute,utility
+AddDevice=nvidia.com/gpu=all
+HealthCmd=python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+HealthInterval=30s
+HealthStartPeriod=10s
+HealthTimeout=5s
+HealthRetries=3
+
+[Service]
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

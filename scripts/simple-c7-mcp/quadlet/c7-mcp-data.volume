@@ -1,0 +1,9 @@
+[Unit]
+Description=C7 MCP LanceDB Data Volume
+
+[Volume]
+VolumeName=c7-mcp-data
+Label=app=c7-mcp
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,12 @@
+.git
+lancedb_data
+quadlet
+scripts
+tests
+IMPLEMENTATION*.md
+JUSTFILE*.md
+LANCEDB_SCHEMA.md
+FETCH_DOC_GUIDE.md
+MCP_TRANSPORT_ISSUE.md
+test_*.py
+justfile

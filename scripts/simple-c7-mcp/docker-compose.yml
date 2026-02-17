@@ -1,0 +1,21 @@
+services:
+  c7-mcp:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - systemd-c7-mcp-data:/app/lancedb_data
+    environment:
+      - LANCEDB_PATH=/app/lancedb_data
+    # GPU passthrough requires NVIDIA Container Toolkit CDI specs:
+    #   sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  systemd-c7-mcp-data:

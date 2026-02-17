@@ -4,7 +4,9 @@ import re
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from c7_mcp.db import close_db, init_schema
 from c7_mcp.exceptions import (
@@ -50,6 +52,42 @@ app = FastAPI(
     version="0.1.0",
     description="Context7-compatible MCP server with library and document management",
     lifespan=lifespan,
+)
+
+
+class _McpCorsMiddleware:
+    """Always add Access-Control-Expose-Headers for MCP responses.
+
+    The MCP spec requires clients to read the Mcp-Session-Id response
+    header.  This middleware unconditionally exposes it so both same-origin
+    and cross-origin clients can access it.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or not scope["path"].startswith("/mcp"):
+            await self.app(scope, receive, send)
+            return
+
+        async def _send(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                headers.append((b"access-control-expose-headers", b"Mcp-Session-Id"))
+                message["headers"] = headers
+            await send(message)
+
+        await self.app(scope, receive, _send)
+
+
+app.add_middleware(_McpCorsMiddleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Accept", "Mcp-Session-Id", "MCP-Protocol-Version"],
+    expose_headers=["Mcp-Session-Id"],
 )
 
 
