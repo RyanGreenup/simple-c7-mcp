@@ -1,529 +1,596 @@
-# requests-cache
+# Requests - Python HTTP Library
 
-## Introduction
+Requests is an elegant and simple HTTP library for Python, designed to make HTTP communication straightforward and human-friendly. It abstracts the complexities of making HTTP requests behind a beautiful, simple API, allowing developers to send HTTP/1.1 requests with various methods (GET, POST, PUT, DELETE, etc.) with minimal code. The library handles connection pooling, sessions with cookie persistence, SSL/TLS verification, content decompression, and automatic encoding detection seamlessly.
 
-requests-cache is a persistent HTTP cache that provides an easy way to get better performance with the Python requests library. It acts as a transparent caching layer for HTTP requests, storing responses in various backend storage systems and retrieving them instantly when the same request is made again. This eliminates redundant network calls and dramatically improves response times, especially useful for applications that repeatedly access the same APIs or web resources.
+As one of the most downloaded Python packages with approximately 30 million downloads per week and over 1 million dependent repositories on GitHub, Requests has become the de facto standard for HTTP communication in Python. It supports features like Keep-Alive, international domain names, browser-style SSL verification, Basic and Digest authentication, multipart file uploads, streaming downloads, SOCKS proxy support, and connection timeouts. The library is designed to be compliant with HTTP specifications while maintaining an intuitive developer experience.
 
-The library supports multiple storage backends including SQLite, Redis, MongoDB, GridFS, DynamoDB, filesystem, and in-memory storage. It offers flexible expiration strategies through manual configuration, Cache-Control headers, and URL pattern matching. requests-cache can be integrated either as a drop-in replacement for requests.Session or installed globally to transparently cache all requests functions throughout an application.
+## GET Request
 
-## API Documentation and Code Examples
-
-### CachedSession - Basic Usage
-
-Drop-in replacement for requests.Session that adds caching capabilities with SQLite backend by default.
-
-```python
-import requests_cache
-
-# Create a cached session with SQLite backend
-session = requests_cache.CachedSession('demo_cache')
-
-# First request hits the network and caches response
-response = session.get('https://httpbin.org/get')
-print(response.from_cache)  # False
-
-# Second request returns cached response instantly
-response = session.get('https://httpbin.org/get')
-print(response.from_cache)  # True
-
-# All standard requests methods work
-response = session.post('https://httpbin.org/post', json={'key': 'value'})
-response = session.put('https://httpbin.org/put', data='test')
-response = session.delete('https://httpbin.org/delete')
-```
-
-### install_cache - Global Patching
-
-Install caching globally to make all requests functions automatically cached without modifying code.
+Send HTTP GET requests to retrieve data from URLs. The response object contains the status code, headers, and content.
 
 ```python
 import requests
-import requests_cache
 
-# Install cache globally
-requests_cache.install_cache('global_cache')
+# Simple GET request
+response = requests.get('https://api.github.com/events')
 
-# Now all requests functions use caching automatically
-response = requests.get('https://httpbin.org/get')
-print(response.from_cache)  # False on first call
+# Check response status
+print(response.status_code)  # 200
+print(response.ok)           # True
 
-response = requests.get('https://httpbin.org/get')
-print(response.from_cache)  # True on subsequent calls
+# Access response content
+print(response.text)         # Response body as string
+print(response.content)      # Response body as bytes
+print(response.json())       # Parse JSON response
 
-# Disable caching globally
-requests_cache.uninstall_cache()
+# Access headers (case-insensitive)
+print(response.headers['Content-Type'])    # 'application/json; charset=utf-8'
+print(response.headers.get('X-RateLimit-Remaining'))
+
+# GET with URL parameters
+params = {'key1': 'value1', 'key2': 'value2'}
+response = requests.get('https://httpbin.org/get', params=params)
+print(response.url)  # https://httpbin.org/get?key1=value1&key2=value2
+
+# GET with custom headers
+headers = {'User-Agent': 'my-app/1.0', 'Accept': 'application/json'}
+response = requests.get('https://api.github.com/user', headers=headers)
 ```
 
-### Expiration - Time-Based Cache Control
+## POST Request
 
-Configure cache expiration using various time formats to keep responses fresh.
+Send HTTP POST requests to submit data to a server. Supports form-encoded data, JSON payloads, and multipart file uploads.
 
 ```python
-from datetime import timedelta
-from requests_cache import CachedSession
+import requests
 
-# Set expiration in seconds
-session = CachedSession('cache', expire_after=360)
-response = session.get('https://httpbin.org/get')
-print(f'Expires: {response.expires}')
+# POST with form data (automatically form-encoded)
+data = {'username': 'john', 'password': 'secret123'}
+response = requests.post('https://httpbin.org/post', data=data)
+print(response.json()['form'])  # {'username': 'john', 'password': 'secret123'}
 
-# Set expiration using timedelta
-session = CachedSession('cache', expire_after=timedelta(hours=1))
-response = session.get('https://httpbin.org/get')
+# POST with JSON data (automatically serialized and Content-Type set)
+payload = {'name': 'John Doe', 'email': 'john@example.com'}
+response = requests.post('https://httpbin.org/post', json=payload)
+print(response.json()['json'])  # {'name': 'John Doe', 'email': 'john@example.com'}
 
-# Per-request expiration override
-response = session.get('https://httpbin.org/delay/1', expire_after=60)
+# POST with raw string data
+response = requests.post('https://httpbin.org/post', data='raw string data')
 
-# Check if response is expired
-import time
-time.sleep(61)
-print(response.is_expired)  # True
-
-# Never expire (default)
-session = CachedSession('cache', expire_after=-1)
+# POST multiple values for same key
+data = [('key', 'value1'), ('key', 'value2')]
+response = requests.post('https://httpbin.org/post', data=data)
 ```
 
-### Cache-Control Headers
+## PUT, PATCH, DELETE Requests
 
-Automatically use HTTP Cache-Control and other standard headers for expiration.
+Perform resource updates and deletions using standard HTTP methods.
 
 ```python
-from requests_cache import CachedSession
+import requests
 
-# Enable automatic Cache-Control support
-session = CachedSession('cache', cache_control=True)
+# PUT request - replace entire resource
+data = {'name': 'Updated Name', 'email': 'updated@example.com'}
+response = requests.put('https://httpbin.org/put', json=data)
+print(response.status_code)  # 200
 
-# Server's Cache-Control headers will determine expiration
-response = session.get('https://httpbin.org/cache/3600')
-print(f'Cached until: {response.expires}')
+# PATCH request - partial update
+patch_data = {'email': 'newemail@example.com'}
+response = requests.patch('https://httpbin.org/patch', json=patch_data)
+print(response.json()['json'])  # {'email': 'newemail@example.com'}
 
-# Combine with default expiration as fallback
-session = CachedSession(
-    'cache',
-    cache_control=True,
-    expire_after=timedelta(days=1)  # Used when server doesn't send Cache-Control
-)
+# DELETE request
+response = requests.delete('https://httpbin.org/delete')
+print(response.status_code)  # 200
+
+# HEAD request - get headers only
+response = requests.head('https://httpbin.org/get')
+print(response.headers)
+print(response.text)  # Empty - HEAD doesn't return body
+
+# OPTIONS request
+response = requests.options('https://httpbin.org/get')
 ```
 
-### URL Pattern Expiration
+## File Upload
 
-Define different expiration times for different URL patterns using glob or regex patterns.
+Upload files using multipart form data encoding. Supports single and multiple file uploads with custom filenames and content types.
 
 ```python
-from datetime import timedelta
-from requests_cache import CachedSession, DO_NOT_CACHE, NEVER_EXPIRE
+import requests
 
-# Configure per-URL expiration patterns
-urls_expire_after = {
-    'httpbin.org/image': timedelta(days=7),  # Images expire in 7 days
-    '*.fillmurray.com': NEVER_EXPIRE,        # Never expire
-    '*.placeholder.com/*': DO_NOT_CACHE,     # Never cache
+# Simple file upload
+files = {'file': open('report.pdf', 'rb')}
+response = requests.post('https://httpbin.org/post', files=files)
+
+# Upload with custom filename and content type
+files = {
+    'file': ('custom_name.pdf', open('report.pdf', 'rb'), 'application/pdf')
 }
+response = requests.post('https://httpbin.org/post', files=files)
 
-session = CachedSession(
-    'cache',
-    expire_after=3600,  # Default: 1 hour
-    urls_expire_after=urls_expire_after
-)
+# Upload with additional headers per file
+files = {
+    'file': ('report.pdf', open('report.pdf', 'rb'), 'application/pdf', {'Expires': '0'})
+}
+response = requests.post('https://httpbin.org/post', files=files)
 
-# Each URL will use its matching pattern's expiration
-response1 = session.get('https://httpbin.org/get')         # Expires in 1 hour
-response2 = session.get('https://httpbin.org/image/jpeg')  # Expires in 7 days
-response3 = session.get('https://www.fillmurray.com/460/300')  # Never expires
+# Upload string as file
+files = {'file': ('data.csv', 'col1,col2\nval1,val2\n', 'text/csv')}
+response = requests.post('https://httpbin.org/post', files=files)
 
-print(f'Response 1 expires: {response1.expires}')
-print(f'Response 2 expires: {response2.expires}')
-print(f'Response 3 expires: {response3.expires}')  # None (never)
+# Multiple file upload
+files = [
+    ('images', ('photo1.png', open('photo1.png', 'rb'), 'image/png')),
+    ('images', ('photo2.png', open('photo2.png', 'rb'), 'image/png'))
+]
+response = requests.post('https://httpbin.org/post', files=files)
+
+# Upload file with additional form data
+files = {'file': open('document.pdf', 'rb')}
+data = {'description': 'Important document', 'category': 'reports'}
+response = requests.post('https://httpbin.org/post', files=files, data=data)
 ```
 
-### Backend Selection
+## Session Objects
 
-Choose from multiple storage backends with different characteristics and configurations.
-
-```python
-from requests_cache import CachedSession
-from requests_cache.backends import RedisCache, MongoCache, FileCache
-
-# SQLite backend (default)
-session = CachedSession('cache.db', backend='sqlite')
-
-# Redis backend
-session = CachedSession('my_cache', backend='redis')
-
-# Redis with custom connection
-backend = RedisCache(host='192.168.1.63', port=6379, password='secret')
-session = CachedSession(backend=backend)
-
-# MongoDB backend
-session = CachedSession('my_db', backend='mongodb')
-
-# Filesystem backend with JSON serialization
-session = CachedSession('~/cache_dir', backend='filesystem')
-
-# In-memory backend (no persistence)
-session = CachedSession('memory_cache', backend='memory')
-
-# DynamoDB backend
-session = CachedSession('my_table', backend='dynamodb')
-```
-
-### Advanced Session Configuration
-
-Configure caching behavior with fine-grained control over what gets cached and how requests are matched.
-
-```python
-from datetime import timedelta
-from requests_cache import CachedSession
-
-session = CachedSession(
-    'advanced_cache',
-    use_cache_dir=True,                # Save in platform-specific cache directory
-    cache_control=True,                # Use Cache-Control headers
-    expire_after=timedelta(days=1),    # Default expiration
-    allowable_codes=[200, 400],        # Cache these status codes
-    allowable_methods=['GET', 'POST'], # Cache these HTTP methods
-    ignored_parameters=['api_key', 'token'],  # Exclude from cache key and redact
-    match_headers=['Accept-Language'], # Include these headers in cache matching
-    stale_if_error=True,               # Return stale cache on errors
-    always_revalidate=False,           # Revalidate every request
-)
-
-# Make requests with configured behavior
-response = session.get(
-    'https://api.example.com/data',
-    params={'api_key': 'secret123', 'query': 'test'}
-)
-
-# api_key is redacted from cached request
-print(response.request.url)  # api_key won't appear
-```
-
-### Cache Management
-
-Inspect, filter, and manage cached responses programmatically.
-
-```python
-from requests_cache import CachedSession
-
-session = CachedSession('cache')
-
-# Populate cache
-session.get('https://httpbin.org/get')
-session.get('https://httpbin.org/delay/1')
-
-# Get cache information
-print(f'Total responses: {len(session.cache.responses)}')
-print(f'Cached URLs: {list(session.cache.urls())}')
-
-# Check if URL is cached
-print(session.cache.has_url('https://httpbin.org/get'))  # True
-
-# Get cached response by key
-cache_key = session.cache.create_key(session.get('https://httpbin.org/get').request)
-cached_response = session.cache.get_response(cache_key)
-
-# Delete specific responses
-session.cache.delete(urls=['https://httpbin.org/get'])
-
-# Delete expired responses
-session.cache.delete(expired=True)
-
-# Clear entire cache
-session.cache.clear()
-```
-
-### Temporary Cache Control
-
-Temporarily disable or enable caching within specific code blocks.
+Use sessions for persistent parameters, cookie handling, and connection pooling across multiple requests to the same host.
 
 ```python
 import requests
-import requests_cache
 
-# Using context manager with CachedSession
-session = requests_cache.CachedSession('cache')
+# Create session - persists cookies and connection pooling
+session = requests.Session()
 
-# Normal cached request
-response = session.get('https://httpbin.org/get')
-print(response.from_cache)  # May be True
+# Set default parameters for all requests in session
+session.auth = ('user', 'pass')
+session.headers.update({'X-Custom-Header': 'value', 'User-Agent': 'MyApp/1.0'})
 
-# Temporarily disable cache
-with session.cache_disabled():
-    response = session.get('https://httpbin.org/ip')
-    print(response.from_cache)  # Always False
+# Cookies persist automatically across requests
+session.get('https://httpbin.org/cookies/set/sessioncookie/abc123')
+response = session.get('https://httpbin.org/cookies')
+print(response.json())  # {'cookies': {'sessioncookie': 'abc123'}}
 
-# Using global patching with context managers
-with requests_cache.enabled('temp_cache'):
-    response = requests.get('https://httpbin.org/get')
-    print(response.from_cache)  # Cached within context
+# Session as context manager (auto-closes connections)
+with requests.Session() as s:
+    s.headers.update({'Authorization': 'Bearer token123'})
+    response = s.get('https://api.github.com/user')
+    response = s.get('https://api.github.com/user/repos')
 
-# Temporarily disable global cache
-requests_cache.install_cache('cache')
-with requests_cache.disabled():
-    response = requests.get('https://httpbin.org/get')
-    print(response.from_cache)  # Always False
+# Session-level settings
+session = requests.Session()
+session.verify = '/path/to/ca-bundle.crt'  # SSL verification
+session.cert = ('/path/to/client.cert', '/path/to/client.key')  # Client cert
+session.proxies = {'http': 'http://proxy:8080', 'https': 'http://proxy:8080'}
+session.max_redirects = 10
+session.trust_env = False  # Disable environment variables
+
+# Method-level params override session params
+response = session.get('https://httpbin.org/get', headers={'X-Request-ID': '12345'})
 ```
 
-### Request Refresh Options
+## Authentication
 
-Control when cached responses are revalidated or refreshed.
+Support for Basic, Digest, and custom authentication methods.
 
 ```python
-from requests_cache import CachedSession
+import requests
+from requests.auth import HTTPBasicAuth, HTTPDigestAuth
 
-session = CachedSession('cache', expire_after=3600)
+# Basic Authentication - tuple shorthand
+response = requests.get(
+    'https://httpbin.org/basic-auth/user/pass',
+    auth=('user', 'pass')
+)
+print(response.status_code)  # 200
 
-# Normal cached request
-response = session.get('https://httpbin.org/get')
+# Basic Authentication - explicit class
+auth = HTTPBasicAuth('user', 'pass')
+response = requests.get('https://httpbin.org/basic-auth/user/pass', auth=auth)
 
-# Soft refresh: revalidate with server using conditional request
-response = session.get('https://httpbin.org/get', refresh=True)
-print(response.revalidated)  # True if server returned 304 Not Modified
+# Digest Authentication
+auth = HTTPDigestAuth('user', 'pass')
+response = requests.get('https://httpbin.org/digest-auth/auth/user/pass', auth=auth)
 
-# Hard refresh: force new request and overwrite cache
-response = session.get('https://httpbin.org/get', force_refresh=True)
-print(response.from_cache)  # False
+# Custom Authentication Handler
+class TokenAuth(requests.auth.AuthBase):
+    """Custom authentication using Bearer token."""
+    def __init__(self, token):
+        self.token = token
 
-# Only return if cached, otherwise return 504
-response = session.get('https://httpbin.org/get', only_if_cached=True)
-if response.status_code == 504:
-    print('Not cached')
+    def __call__(self, request):
+        request.headers['Authorization'] = f'Bearer {self.token}'
+        return request
+
+# Use custom auth
+response = requests.get('https://api.example.com/data', auth=TokenAuth('mytoken123'))
+
+# Session with persistent auth
+session = requests.Session()
+session.auth = ('user', 'pass')
+response = session.get('https://httpbin.org/basic-auth/user/pass')
 ```
 
-### Stale Response Handling
+## Timeouts
 
-Configure behavior when cached responses are stale or requests fail.
+Configure connection and read timeouts to prevent hanging requests.
 
 ```python
-from requests_cache import CachedSession
+import requests
+from requests.exceptions import Timeout, ConnectTimeout, ReadTimeout
 
-# Return stale cache on error
-session = CachedSession('cache', stale_if_error=True)
-
-response = session.get('https://httpbin.org/get', expire_after=1)
-import time
-time.sleep(2)
-
-# If the server is down or returns an error, stale cache is returned
+# Single timeout value (applies to both connect and read)
 try:
-    response = session.get('https://httpbin.org/get')
-    print(f'Used stale cache: {response.from_cache}')
-except Exception:
+    response = requests.get('https://httpbin.org/delay/5', timeout=3)
+except Timeout:
+    print('Request timed out')
+
+# Separate connect and read timeouts (connect=3.05s, read=27s)
+response = requests.get('https://httpbin.org/get', timeout=(3.05, 27))
+
+# No timeout (wait forever) - not recommended for production
+response = requests.get('https://httpbin.org/get', timeout=None)
+
+# Handle specific timeout types
+try:
+    response = requests.get('https://httpbin.org/delay/10', timeout=2)
+except ConnectTimeout:
+    print('Connection timed out')
+except ReadTimeout:
+    print('Read timed out')
+except Timeout:
+    print('Request timed out (connect or read)')
+
+# Session with default timeout
+session = requests.Session()
+# Note: timeout must be set per-request, not on session
+response = session.get('https://httpbin.org/get', timeout=5)
+```
+
+## Error Handling
+
+Handle HTTP errors and exceptions properly.
+
+```python
+import requests
+from requests.exceptions import (
+    RequestException, HTTPError, ConnectionError,
+    Timeout, TooManyRedirects, JSONDecodeError
+)
+
+# Check status and raise exception for 4xx/5xx responses
+response = requests.get('https://httpbin.org/status/404')
+print(response.status_code)  # 404
+print(response.ok)           # False
+
+try:
+    response.raise_for_status()
+except HTTPError as e:
+    print(f'HTTP Error: {e}')  # 404 Client Error: NOT FOUND
+
+# Comprehensive error handling
+def safe_request(url):
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except ConnectionError:
+        print('Failed to connect to server')
+    except Timeout:
+        print('Request timed out')
+    except TooManyRedirects:
+        print('Too many redirects')
+    except HTTPError as e:
+        print(f'HTTP error occurred: {e}')
+    except JSONDecodeError:
+        print('Response is not valid JSON')
+    except RequestException as e:
+        print(f'Request failed: {e}')
+    return None
+
+# Status code checking
+response = requests.get('https://httpbin.org/get')
+if response.status_code == requests.codes.ok:
+    print('Success!')
+elif response.status_code == requests.codes.not_found:
+    print('Not found')
+```
+
+## Streaming Responses
+
+Handle large responses efficiently by streaming content in chunks.
+
+```python
+import requests
+
+# Enable streaming (don't download entire response at once)
+response = requests.get('https://httpbin.org/stream/100', stream=True)
+
+# Iterate over content in chunks
+with requests.get('https://example.com/large-file.zip', stream=True) as r:
+    r.raise_for_status()
+    with open('large-file.zip', 'wb') as f:
+        for chunk in r.iter_content(chunk_size=8192):
+            f.write(chunk)
+
+# Stream lines (useful for streaming APIs)
+response = requests.get('https://httpbin.org/stream/20', stream=True)
+for line in response.iter_lines():
+    if line:
+        print(line.decode('utf-8'))
+
+# Conditional download based on content length
+response = requests.get('https://example.com/file.zip', stream=True)
+if int(response.headers.get('content-length', 0)) < 1000000:  # Less than 1MB
+    content = response.content
+else:
+    # Stream large files
     pass
 
-# Limit staleness with time value in seconds
-session = CachedSession('cache', stale_if_error=3600)  # Max 1 hour stale
+# Access raw socket response
+response = requests.get('https://httpbin.org/stream/5', stream=True)
+print(response.raw.read(100))  # Read raw bytes
 ```
 
-### Custom Request Matching
+## Proxies and SSL
 
-Implement custom cache key generation for specialized matching requirements.
-
-```python
-from requests_cache import CachedSession
-from requests import PreparedRequest
-
-def custom_key_fn(request: PreparedRequest, **kwargs) -> str:
-    """Generate cache key based only on URL path, ignoring query params"""
-    from urllib.parse import urlparse
-    parsed = urlparse(request.url)
-    # Use only scheme, host, and path for matching
-    key = f"{request.method}:{parsed.scheme}://{parsed.netloc}{parsed.path}"
-    return key
-
-session = CachedSession('cache', key_fn=custom_key_fn)
-
-# Both requests will match the same cache key
-response1 = session.get('https://httpbin.org/get?param1=a')
-response2 = session.get('https://httpbin.org/get?param2=b')
-print(response2.from_cache)  # True (matched despite different params)
-```
-
-### Custom Response Filtering
-
-Filter which responses get cached using custom logic.
+Configure proxy servers and SSL/TLS certificate verification.
 
 ```python
-from requests_cache import CachedSession
-from requests import Response
+import requests
 
-def filter_fn(response: Response) -> bool:
-    """Only cache responses with JSON content type"""
-    content_type = response.headers.get('Content-Type', '')
-    return 'application/json' in content_type
+# HTTP and HTTPS proxies
+proxies = {
+    'http': 'http://10.10.1.10:3128',
+    'https': 'http://10.10.1.10:1080'
+}
+response = requests.get('https://httpbin.org/ip', proxies=proxies)
 
-session = CachedSession('cache', filter_fn=filter_fn)
+# Proxy with authentication
+proxies = {
+    'http': 'http://user:password@10.10.1.10:3128',
+    'https': 'http://user:password@10.10.1.10:1080'
+}
+response = requests.get('https://httpbin.org/ip', proxies=proxies)
 
-# JSON response will be cached
-response1 = session.get('https://httpbin.org/json')
-print(response1.from_cache)  # May be True
+# SOCKS proxy (requires requests[socks])
+proxies = {
+    'http': 'socks5://user:pass@host:port',
+    'https': 'socks5://user:pass@host:port'
+}
+response = requests.get('https://httpbin.org/ip', proxies=proxies)
 
-# HTML response won't be cached
-response2 = session.get('https://httpbin.org/html')
-print(response2.from_cache)  # Always False
-```
+# SSL certificate verification (enabled by default)
+response = requests.get('https://github.com', verify=True)
 
-### Cache Export and Migration
+# Custom CA bundle
+response = requests.get('https://internal.example.com', verify='/path/to/ca-bundle.crt')
 
-Export cached data to different backends or formats for backup or migration.
+# Disable SSL verification (not recommended for production)
+response = requests.get('https://self-signed.example.com', verify=False)
 
-```python
-from requests_cache import CachedSession
-
-# Populate source cache with Redis
-src_session = CachedSession('my_cache', backend='redis')
-src_session.get('https://httpbin.org/get')
-src_session.get('https://httpbin.org/json')
-
-# Export to filesystem with JSON serialization
-dest_session = CachedSession(
-    '~/cache_backup',
-    backend='filesystem',
-    serializer='json'
-)
-dest_session.cache.update(src_session.cache)
-
-# List exported files
-print(f'Exported {len(dest_session.cache.responses)} responses')
-for path in dest_session.cache.paths():
-    print(path)
-
-# Can also export using backend classes directly
-from requests_cache.backends import RedisCache, FileCache
-
-src_cache = RedisCache()
-dest_cache = FileCache('~/backup', serializer='json')
-dest_cache.update(src_cache)
-```
-
-### Serialization Options
-
-Choose different serialization formats for cached data.
-
-```python
-from requests_cache import CachedSession
-
-# Default: Pickle serializer (fastest, most compatible)
-session = CachedSession('cache', backend='sqlite')
-
-# JSON serializer (human-readable, slower)
-session = CachedSession('cache', backend='sqlite', serializer='json')
-
-# YAML serializer (human-readable, requires pyyaml)
-session = CachedSession('cache', backend='sqlite', serializer='yaml')
-
-# BSON serializer (for MongoDB)
-session = CachedSession('cache', backend='mongodb', serializer='bson')
-
-# Filesystem backend automatically serializes to files
-session = CachedSession('~/cache', backend='filesystem', serializer='json')
-response = session.get('https://httpbin.org/get')
-# Response saved as JSON file in ~/cache/
-```
-
-### SQLite Backend Configuration
-
-Configure SQLite-specific options for performance and reliability.
-
-```python
-from requests_cache import CachedSession
-
-# Basic SQLite configuration
-session = CachedSession('cache.db', backend='sqlite')
-
-# Use platform-specific cache directory
-session = CachedSession('my_cache', backend='sqlite', use_cache_dir=True)
-# Saves to ~/.cache/my_cache.sqlite on Linux
-
-# Use temporary directory
-session = CachedSession('temp_cache', backend='sqlite', use_temp=True)
-
-# In-memory database (no persistence)
-session = CachedSession('cache', backend='sqlite', use_memory=True)
-
-# Performance options
-session = CachedSession(
-    'cache.db',
-    backend='sqlite',
-    fast_save=True,      # Faster writes, risk of data loss on crash
-    wal=True,            # Write-Ahead Logging: readers don't block writers
-    busy_timeout=5000,   # Wait 5s if database is locked
+# Client-side certificate (mTLS)
+response = requests.get(
+    'https://client-auth.example.com',
+    cert=('/path/to/client.cert', '/path/to/client.key')
 )
 
-# Vacuum database to reclaim space after deletions
-session.cache.delete(expired=True, vacuum=True)
+# Session with SSL settings
+session = requests.Session()
+session.verify = '/path/to/ca-bundle.crt'
+session.cert = '/path/to/client.pem'
 ```
 
-### Response Inspection
+## Cookies
 
-Inspect cached response metadata and properties.
+Work with cookies using dict-like interface or RequestsCookieJar for advanced control.
 
 ```python
-from requests_cache import CachedSession
+import requests
 
-session = CachedSession('cache', expire_after=3600)
+# Access cookies from response
+response = requests.get('https://httpbin.org/cookies/set/mycookie/myvalue')
+print(response.cookies['mycookie'])  # 'myvalue'
+
+# Send cookies with request
+cookies = {'session_id': 'abc123', 'user': 'john'}
+response = requests.get('https://httpbin.org/cookies', cookies=cookies)
+print(response.json())  # {'cookies': {'session_id': 'abc123', 'user': 'john'}}
+
+# Use RequestsCookieJar for domain/path control
+jar = requests.cookies.RequestsCookieJar()
+jar.set('session', 'value1', domain='httpbin.org', path='/cookies')
+jar.set('other', 'value2', domain='httpbin.org', path='/other')
+
+response = requests.get('https://httpbin.org/cookies', cookies=jar)
+print(response.json())  # Only 'session' cookie sent (path matches)
+
+# Session cookies persist automatically
+session = requests.Session()
+session.get('https://httpbin.org/cookies/set/session_token/xyz789')
+response = session.get('https://httpbin.org/cookies')
+print(response.json()['cookies']['session_token'])  # 'xyz789'
+
+# Clear session cookies
+session.cookies.clear()
+```
+
+## Prepared Requests
+
+Build and modify requests before sending for advanced use cases.
+
+```python
+import requests
+from requests import Request, Session
+
+# Create and prepare a request
+session = Session()
+
+request = Request('POST', 'https://httpbin.org/post',
+    data={'key': 'value'},
+    headers={'X-Custom': 'header'}
+)
+prepared = session.prepare_request(request)
+
+# Modify prepared request
+prepared.body = 'Modified body content'
+prepared.headers['X-Extra'] = 'extra-value'
+
+# Send prepared request
+response = session.send(prepared, timeout=5, verify=True)
+print(response.status_code)
+
+# Inspect what will be sent
+print(prepared.method)   # 'POST'
+print(prepared.url)      # 'https://httpbin.org/post'
+print(prepared.headers)  # Headers dict
+print(prepared.body)     # Request body
+
+# Merge environment settings
+settings = session.merge_environment_settings(
+    prepared.url,
+    proxies={},
+    stream=None,
+    verify=None,
+    cert=None
+)
+response = session.send(prepared, **settings)
+```
+
+## Event Hooks
+
+Attach callbacks to requests for logging, modification, or monitoring.
+
+```python
+import requests
+
+# Define hook function
+def log_response(response, *args, **kwargs):
+    print(f'URL: {response.url}')
+    print(f'Status: {response.status_code}')
+    print(f'Elapsed: {response.elapsed.total_seconds()}s')
+
+# Single hook
+response = requests.get(
+    'https://httpbin.org/get',
+    hooks={'response': log_response}
+)
+
+# Multiple hooks
+def add_timestamp(response, *args, **kwargs):
+    response.timestamp = response.elapsed.total_seconds()
+    return response
+
+def check_status(response, *args, **kwargs):
+    if response.status_code >= 400:
+        print(f'Error: {response.status_code}')
+
+response = requests.get(
+    'https://httpbin.org/get',
+    hooks={'response': [log_response, add_timestamp, check_status]}
+)
+print(response.timestamp)
+
+# Session-level hooks
+session = requests.Session()
+session.hooks['response'].append(log_response)
+
+# All requests through this session will trigger the hook
 response = session.get('https://httpbin.org/get')
-
-# Check if response came from cache
-print(f'From cache: {response.from_cache}')
-
-# Check expiration
-print(f'Expires at: {response.expires}')
-print(f'Is expired: {response.is_expired}')
-
-# Check if response was revalidated
-print(f'Revalidated: {response.revalidated}')
-
-# Get cache key for this response
-cache_key = session.cache.create_key(response.request)
-print(f'Cache key: {cache_key}')
-
-# Access original request that was cached
-print(f'Cached URL: {response.request.url}')
-print(f'Cached method: {response.request.method}')
-print(f'Cached headers: {response.request.headers}')
+response = session.get('https://httpbin.org/headers')
 ```
 
-### Filtering Cached Responses
+## HTTPAdapter and Retries
 
-Query and filter cached responses based on various criteria.
+Configure connection pooling, retries, and custom transport behavior.
 
 ```python
-from requests_cache import CachedSession
-from datetime import datetime, timedelta
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 
-session = CachedSession('cache')
+# Configure automatic retries
+session = requests.Session()
 
-# Populate cache with various responses
-session.get('https://httpbin.org/get', expire_after=60)
-session.get('https://httpbin.org/json', expire_after=3600)
-session.get('https://httpbin.org/html')  # Never expires
+retry_strategy = Retry(
+    total=3,                    # Total retry attempts
+    backoff_factor=0.5,         # Wait 0.5, 1, 2 seconds between retries
+    status_forcelist=[500, 502, 503, 504],  # Retry on these status codes
+    allowed_methods=['GET', 'POST'],  # Methods to retry
+)
 
-# Get all cached responses
-all_responses = list(session.cache.filter())
-print(f'Total cached: {len(all_responses)}')
+adapter = HTTPAdapter(max_retries=retry_strategy)
+session.mount('http://', adapter)
+session.mount('https://', adapter)
 
-# Get only expired responses
-expired = list(session.cache.filter(expired=True, valid=False))
-print(f'Expired: {len(expired)}')
+response = session.get('https://httpbin.org/status/503')  # Will retry
 
-# Get only valid (non-expired) responses
-valid = list(session.cache.filter(valid=True, expired=False))
-print(f'Valid: {len(valid)}')
+# Configure connection pool size
+adapter = HTTPAdapter(
+    pool_connections=10,  # Number of connection pools to cache
+    pool_maxsize=20,      # Max connections per pool
+    max_retries=3,
+    pool_block=False      # Don't block when pool is full
+)
+session.mount('https://', adapter)
 
-# SQLite backend: get sorted responses
-session = CachedSession('cache', backend='sqlite')
-# Sort by expiration time
-for response in session.cache.sorted(key='expires', limit=10):
-    print(f'{response.url}: {response.expires}')
+# Custom adapter for specific hosts
+session = requests.Session()
+session.mount('https://api.example.com/', HTTPAdapter(max_retries=5))
+session.mount('https://slow-api.example.com/', HTTPAdapter(pool_maxsize=5))
+```
 
-# Sort by size
-for response in session.cache.sorted(key='size', reversed=True, limit=5):
-    print(f'{response.url}: {len(response.content)} bytes')
+## Response Object Properties
+
+Access all information from HTTP responses including content, headers, status, and metadata.
+
+```python
+import requests
+
+response = requests.get('https://httpbin.org/get')
+
+# Status information
+print(response.status_code)    # 200
+print(response.reason)         # 'OK'
+print(response.ok)             # True (status < 400)
+print(response.is_redirect)    # False
+
+# Content in different formats
+print(response.text)           # Decoded text content
+print(response.content)        # Raw bytes
+print(response.json())         # Parsed JSON (if applicable)
+
+# Encoding
+print(response.encoding)       # 'utf-8' (detected or from headers)
+print(response.apparent_encoding)  # Detected from content
+
+# Headers (case-insensitive dict)
+print(response.headers)
+print(response.headers['Content-Type'])
+print(response.headers.get('X-Custom', 'default'))
+
+# URL and redirect history
+print(response.url)            # Final URL after redirects
+print(response.history)        # List of redirect responses
+
+# Request that generated this response
+print(response.request.method)
+print(response.request.url)
+print(response.request.headers)
+
+# Timing
+print(response.elapsed)        # timedelta of request duration
+print(response.elapsed.total_seconds())
+
+# Links from Link header
+print(response.links)          # Parsed link headers
+
+# Cookies
+print(response.cookies)        # CookieJar from response
 ```
 
 ## Summary
 
-requests-cache is designed for applications that need to optimize HTTP request performance through intelligent caching. Common use cases include web scraping applications that repeatedly access the same URLs, API clients that make redundant requests, development and testing environments where deterministic responses are needed, and any application with rate-limited APIs where minimizing requests is critical. The library excels at reducing latency from seconds to sub-milliseconds for cached responses while maintaining compatibility with the standard requests API.
+Requests is the go-to HTTP library for Python developers who need to interact with web services, APIs, and web applications. Its primary use cases include consuming RESTful APIs, web scraping, automated testing, microservice communication, and any application requiring HTTP communication. The library excels at simplifying common patterns like authentication, session management, file uploads, and handling various response formats while providing enough flexibility for advanced scenarios through prepared requests, custom adapters, and hooks.
 
-Integration patterns vary from simple drop-in session replacement for basic caching needs, to global patching for transparent caching across an entire application, to advanced configurations with custom backends, serializers, and matching logic for specialized requirements. The library supports both development workflows (using in-memory or SQLite caches) and production deployments (using Redis, MongoDB, or DynamoDB for distributed caching). With features like conditional requests, stale-while-revalidate, per-URL expiration patterns, and response filtering, requests-cache provides a comprehensive solution for HTTP caching in Python applications.
+Integration with Requests follows a straightforward pattern: create a session for persistent configuration and connection reuse, set up authentication and default headers, then make requests using the appropriate HTTP method. For production applications, always configure timeouts, implement proper error handling with try/except blocks around requests, and use raise_for_status() to catch HTTP errors. The library integrates seamlessly with the broader Python ecosystem and serves as the foundation for higher-level libraries like requests-oauthlib for OAuth and requests-toolbelt for advanced multipart encoding.
