@@ -1,1938 +1,1804 @@
-# SolidJS
+### GET Server Function Example
 
-SolidJS is a declarative JavaScript library for building user interfaces with fine-grained reactivity. Instead of using a Virtual DOM, it compiles JSX templates to real DOM nodes and updates them with precise, surgical reactivity. The library uses a render-once mental model where component functions execute only once to set up the view, while reactive primitives like signals, memos, and effects handle all subsequent updates automatically through dependency tracking.
+Source: https://docs.solidjs.com/solid-start/reference/server/get
 
-At its core, SolidJS provides a powerful reactive system that efficiently manages state and side effects. Components are regular JavaScript functions that return JSX, and the framework's compiler transforms this JSX into optimized DOM operations. With a size of under 7KB minified and gzipped, SolidJS delivers performance comparable to vanilla JavaScript while providing a developer experience similar to React. The library supports modern features including Suspense, streaming SSR, progressive hydration, Error Boundaries, concurrent rendering, Context API, and first-class TypeScript support.
+Demonstrates how to define a server function using `GET` that returns a streaming promise with a cache-control header.
 
-## Reactive Primitives
+```APIDOC
+## GET /api/example
 
-### createSignal - Create reactive state with getter and setter
+### Description
+Creates a server function accessed via an HTTP GET request. Arguments are serialized into the URL, allowing the use of HTTP cache-control headers. This example demonstrates a streaming promise with a 60-second cache life.
 
-Creates the most basic reactive primitive for managing state. Returns a tuple with a getter (accessor) function and a setter function. The getter automatically tracks dependencies when called inside reactive contexts, and the setter triggers updates only to dependent computations.
+### Method
+GET
 
-```typescript
-import { createSignal, createEffect } from "solid-js";
+### Endpoint
+`/api/example` (This is a conceptual endpoint based on the example usage)
 
-// Basic counter with type inference
-const [count, setCount] = createSignal(0);
-console.log(count()); // 0
+### Parameters
+#### Server Function Signature
+`GET<T extends (...args: any[]) => any>(fn: T): (...args: Parameters<T>) => ReturnType<T>`
 
-// Update with a value
-setCount(5);
-console.log(count()); // 5
+#### Server Function Arguments (serialized to URL)
+- **name** (string) - Required - The name to be used in the greeting.
 
-// Update with a function (receives previous value)
-setCount(prev => prev + 1);
-console.log(count()); // 6
+### Request Example
+(No direct HTTP request example, as it's invoked via function call in the server context)
 
-// Signal with custom equality function
-const [user, setUser] = createSignal(
-  { name: "John", age: 30 },
-  { equals: (prev, next) => prev.name === next.name && prev.age === next.age }
-);
+### Response
+#### Success Response (200)
+- **hello** (Promise<string>) - A promise that resolves with a greeting string after a delay.
+- **headers** (object) - Contains `cache-control: max-age=60`.
 
-// Automatic dependency tracking in effects
-createEffect(() => {
-  console.log(`Count is now: ${count()}`);
-});
-
-setCount(10); // Logs: "Count is now: 10"
-
-// Signal without initial value (type becomes T | undefined)
-const [data, setData] = createSignal<string>();
-console.log(data()); // undefined
-setData("hello");
-console.log(data()); // "hello"
+#### Response Example
+```json
+{
+  "hello": "<streaming promise response>"
+}
+```
 ```
 
-### createMemo - Create derived reactive state
+--------------------------------
 
-Creates a read-only derived signal that memoizes computed values. Only re-evaluates when its dependencies change, and only notifies subscribers if the computed value is different from the previous one.
+### Install Dependencies for SolidStart Project
 
-```typescript
-import { createSignal, createMemo, createEffect } from "solid-js";
+Source: https://docs.solidjs.com/solid-start/getting-started
 
-const [firstName, setFirstName] = createSignal("John");
-const [lastName, setLastName] = createSignal("Doe");
+Commands to install project dependencies after initializing SolidStart and selecting a template. These commands use different package managers to fetch and install all required libraries for the application.
 
-// Derived state that automatically updates
-const fullName = createMemo(() => `${firstName()} ${lastName()}`);
-
-createEffect(() => {
-  console.log(fullName()); // "John Doe"
-});
-
-setFirstName("Jane");
-// Effect runs, logs: "Jane Doe"
-
-// Memo with initial value and custom equality
-const [numbers, setNumbers] = createSignal([1, 2, 3, 4, 5]);
-
-const sum = createMemo(
-  (prev = 0) => {
-    const nums = numbers();
-    return nums.reduce((acc, n) => acc + n, 0);
-  },
-  0,
-  { equals: (a, b) => a === b }
-);
-
-console.log(sum()); // 15
-
-setNumbers([2, 3, 4, 5, 6]);
-console.log(sum()); // 20
-
-// Memos prevent unnecessary recomputation
-const [expensive, setExpensive] = createSignal(100);
-const doubled = createMemo(() => {
-  console.log("Computing doubled...");
-  return expensive() * 2;
-});
-
-// Accessing multiple times only computes once
-console.log(doubled()); // Logs "Computing doubled...", returns 200
-console.log(doubled()); // Returns 200 (no log, uses cached value)
-console.log(doubled()); // Returns 200 (no log, uses cached value)
+```bash
+npm i
 ```
 
-### createEffect - Run side effects reactively
+```bash
+pnpm i
+```
 
-Creates a reactive computation that runs after the render phase. Automatically tracks dependencies and re-runs when they change. Use for side effects like logging, DOM manipulation, or subscriptions.
+```bash
+yarn i
+```
+
+```bash
+bun i
+```
+
+```bash
+deno i
+```
+
+--------------------------------
+
+### Run SolidStart Application Locally
+
+Source: https://docs.solidjs.com/solid-start/getting-started
+
+Commands to start the SolidStart development server. These commands are used to run the application locally, typically on port 3000, allowing for real-time development and testing.
+
+```bash
+npm run dev
+```
+
+```bash
+pnpm dev
+```
+
+```bash
+yarn dev
+```
+
+```bash
+bun run dev
+```
+
+```bash
+deno run dev
+```
+
+--------------------------------
+
+### Fetch Data with createAsync in SolidStart (TypeScript/JavaScript)
+
+Source: https://docs.solidjs.com/solid-start/guides/data-fetching
+
+Example of creating a data query and accessing its data using the `createAsync` primitive in SolidStart. It fetches posts from an API and renders their titles. Dependencies include `@solidjs/router` and `solid-js`.
 
 ```typescript
-import { createSignal, createEffect, onCleanup } from "solid-js";
+// src/routes/index.tsx
+import { For } from "solid-js";
+import { query, createAsync } from "@solidjs/router";
 
-const [count, setCount] = createSignal(0);
-const [enabled, setEnabled] = createSignal(true);
 
-// Basic effect with automatic dependency tracking
-createEffect(() => {
-  console.log(`Current count: ${count()}`);
-});
+const getPosts = query(async () => {
+  const posts = await fetch("https://my-api.com/posts");
+  return await posts.json();
+}, "posts");
 
-setCount(5); // Logs: "Current count: 5"
 
-// Effect with cleanup
-createEffect(() => {
-  if (!enabled()) return;
+export default function Page() {
+  const posts = createAsync(() => getPosts());
+  return (
+    <ul>
+      <For each={posts()}>{(post) => <li>{post.title}</li>}</For>
+    </ul>
+  );
+}
 
-  const interval = setInterval(() => {
-    setCount(c => c + 1);
-  }, 1000);
+```
 
-  // Cleanup runs before re-execution or disposal
-  onCleanup(() => {
-    clearInterval(interval);
-    console.log("Interval cleared");
-  });
-});
+```javascript
+// src/routes/index.jsx
+import { For } from "solid-js";
+import { query, createAsync } from "@solidjs/router";
 
-// Effect with previous value tracking
-createEffect((prevCount = 0) => {
-  const currentCount = count();
-  console.log(`Changed from ${prevCount} to ${currentCount}`);
-  return currentCount;
-});
 
-// Conditional subscription based on signal
-const [userId, setUserId] = createSignal<string | null>(null);
+const getPosts = query(async () => {
+  const posts = await fetch("https://my-api.com/posts");
+  return await posts.json();
+}, "posts");
 
-createEffect(() => {
-  const id = userId();
-  if (!id) return;
 
-  const unsubscribe = subscribeToUser(id, (data) => {
-    console.log("User updated:", data);
-  });
+export default function Page() {
+  const posts = createAsync(() => getPosts());
+  return (
+    <ul>
+      <For each={posts()}>{(post) => <li>{post.title}</li>}</For>
+    </ul>
+  );
+}
 
-  onCleanup(unsubscribe);
-});
+```
 
-setUserId("user-123"); // Subscribes to user-123
-setUserId("user-456"); // Unsubscribes from user-123, subscribes to user-456
-setUserId(null); // Unsubscribes from user-456
+--------------------------------
 
-function subscribeToUser(id: string, callback: (data: any) => void) {
-  console.log(`Subscribed to ${id}`);
-  return () => console.log(`Unsubscribed from ${id}`);
+### SolidStart App without Routing
+
+Source: https://docs.solidjs.com/solid-start/reference/entrypoints/app
+
+A minimal SolidStart application example that does not include routing. This setup is suitable when you only need to render a basic template without complex navigation. It demonstrates a simple 'Hello world!' message within a main element.
+
+```typescript
+export default function App() {
+  return (
+    <main>
+      <h1>Hello world!</h1>
+    </main>
+  );
 }
 ```
 
-### createResource - Manage async data with Suspense integration
+--------------------------------
 
-Creates a reactive resource for handling asynchronous data fetching with built-in loading states, error handling, and Suspense integration. Returns a resource accessor and control functions for refetching and mutation.
+### Example API Route: Dynamic Product Fetch
+
+Source: https://docs.solidjs.com/solid-start/building-your-application/api-routes
+
+An example of an API route that fetches products based on category and brand parameters from the URL.
+
+```APIDOC
+## Example API Route: Dynamic Product Fetch
+
+### Description
+This API route demonstrates how to access dynamic route parameters (category and brand) and use them to fetch data. It assumes a `store.getProducts` function is available.
+
+### Method
+GET
+
+### Endpoint
+`/api/products/:category/:brand` (example)
+
+### Parameters
+#### Path Parameters
+- `category` (string) - Required - The product category.
+- `brand` (string) - Required - The product brand.
+
+#### Query Parameters
+None specified in the example.
+
+### Request Body
+None.
+
+### Response
+#### Success Response (200)
+- Returns a JSON array of products matching the category and brand.
+
+#### Response Example
+```json
+[
+  {
+    "id": 1,
+    "name": "Example Product",
+    "price": 19.99
+  }
+]
+```
+
+### Code Example
+```javascript
+import type { APIEvent } from "@solidjs/start/server";
+import store from "./store";
+
+export async function GET({ params }: APIEvent) {
+  console.log(`Category: ${params.category}, Brand: ${params.brand}`);
+  const products = await store.getProducts(params.category, params.brand);
+  return products;
+}
+```
+
+---
+```
+
+--------------------------------
+
+### SolidStart App with Routing
+
+Source: https://docs.solidjs.com/solid-start/reference/entrypoints/app
+
+This example demonstrates setting up navigation between pages using SolidStart's FileRouter. It imports necessary components from '@solidjs/router' and '@solidjs/start/router'. The `App` component defines a root layout with navigation links and Suspense for asynchronous operations.
 
 ```typescript
-import { createSignal, createResource, Suspense, ErrorBoundary } from "solid-js";
-import { render } from "solid-js/web";
+import { A, Router } from "@solidjs/router";
+import { FileRoutes } from "@solidjs/start/router";
+import { Suspense } from "solid-js";
 
-// Simple resource without source
-const [data] = createResource(async () => {
-  const response = await fetch("https://api.example.com/data");
-  if (!response.ok) throw new Error("Failed to fetch");
-  return response.json();
-});
 
-// Resource with reactive source
-const [userId, setUserId] = createSignal("123");
-
-const [user, { mutate, refetch }] = createResource(userId, async (id) => {
-  const response = await fetch(`https://api.example.com/users/${id}`);
-  return response.json();
-});
-
-// Access resource states
-console.log(user.state); // "pending" | "ready" | "refreshing" | "errored" | "unresolved"
-console.log(user.loading); // boolean
-console.log(user.error); // Error | undefined
-console.log(user.latest); // Latest value, even during refresh
-
-// Manually update resource
-mutate({ name: "John", id: "123" });
-
-// Refetch with custom info
-refetch("manual-refresh");
-
-// Resource with initial value (never undefined)
-const [post, postActions] = createResource(
-  () => "post-1",
-  async (id) => {
-    const response = await fetch(`https://api.example.com/posts/${id}`);
-    return response.json();
-  },
-  { initialValue: { id: "post-1", title: "Loading..." } }
-);
-
-// post() is always defined: InitializedResource<Post>
-console.log(post().title);
-
-// Complete example with Suspense and ErrorBoundary
-function UserProfile() {
-  const [userId, setUserId] = createSignal("123");
-
-  const [user, { refetch }] = createResource(
-    userId,
-    async (id, { value, refetching }) => {
-      console.log("Fetching user:", id);
-      console.log("Previous value:", value);
-      console.log("Is refetching:", refetching);
-
-      const response = await fetch(`https://api.example.com/users/${id}`);
-      if (!response.ok) throw new Error("User not found");
-      return response.json();
-    }
+export default function App() {
+  return (
+    <Router
+      root={(props) => (
+          <A href="/">Index</A>
+          <A href="/about">About</A>
+          <Suspense>{props.children}</Suspense>
+      )}
+    >
+      <FileRoutes />
+    </Router>
   );
+}
+```
 
+--------------------------------
+
+### Initialize SolidStart Project with npm, pnpm, yarn, bun, or deno
+
+Source: https://docs.solidjs.com/solid-start/getting-started
+
+Commands to initialize a new SolidStart project using different package managers. These commands bootstrap the project by creating a new directory and setting up the initial files based on user selections.
+
+```bash
+npm init solid@latest
+```
+
+```bash
+pnpm create solid@latest
+```
+
+```bash
+yarn create solid@latest
+```
+
+```bash
+bun create solid@latest
+```
+
+```bash
+deno init --npm solid@latest
+```
+
+--------------------------------
+
+### Install @solidjs/meta
+
+Source: https://docs.solidjs.com/solid-start/building-your-application/head-and-metadata
+
+Install the @solidjs/meta library to manage head elements in your SolidStart application. This is the primary dependency for customizing titles and metadata.
+
+```bash
+npm i @solidjs/meta
+```
+
+--------------------------------
+
+### Add Fallback Content for Client-Only Components in SolidStart
+
+Source: https://docs.solidjs.com/solid-start/reference/client/client-only
+
+This example shows how to provide fallback content for a client-only component using the `fallback` prop. The fallback UI will be displayed while the client-only component is loading, enhancing the user experience.
+
+```javascript
+<ClientOnlyComp fallback={<div>Loading...</div>} />
+```
+
+--------------------------------
+
+### Dynamically Import Client-Only Component with SolidStart's clientOnly
+
+Source: https://docs.solidjs.com/solid-start/reference/client/client-only
+
+This code illustrates how to use the `clientOnly` function from `@solidjs/start` to dynamically import a component that should only render on the client. It shows the basic setup for importing and using the client-only component.
+
+```javascript
+import { clientOnly } from "@solidjs/start";
+
+
+const ClientOnlyComp = clientOnly(() => import("./ClientOnlyComponent"));
+
+
+export default function IsomorphicComponent() {
+  return <ClientOnlyComp />;
+}
+```
+
+--------------------------------
+
+### Mount SolidStart Client Application (TypeScript)
+
+Source: https://docs.solidjs.com/solid-start/reference/entrypoints/entry-client
+
+This code snippet demonstrates how to mount the SolidStart client application. It imports necessary functions from `@solidjs/start/client` and uses the `mount` function to attach the `<StartClient />` component to the DOM element with the ID 'app'. This is the standard entry point for client-side rendering in a SolidStart project.
+
+```typescript
+import { mount, StartClient } from "@solidjs/start/client";
+
+mount(() => <StartClient />, document.getElementById("app")!);
+```
+
+--------------------------------
+
+### Using CSS Modules for Scoped Styles in SolidStart
+
+Source: https://docs.solidjs.com/solid-start/building-your-application/css-and-styling
+
+Explains how to use CSS modules (`.module.css`) in SolidStart for locally scoped styles. It shows how to import styles and apply them using the `styles` object to ensure unique class names.
+
+```css
+.card {
+  background-color: #446b9e;
+}
+
+div.card > h1 {
+  font-size: 1.5em;
+  font-weight: bold;
+}
+
+div.card > p {
+  font-size: 1em;
+  font-weight: normal;
+}
+```
+
+```tsx
+import styles from "./Card.module.css";
+
+
+const Card = (props) => {
+  return (
+    <div class={styles.card}>
+      <h1>{props.title}</h1>
+      <p>{props.text}</p>
+    </div>
+  );
+};
+
+```
+
+--------------------------------
+
+### Client-Side Data Fetching with createResource (SolidJS)
+
+Source: https://docs.solidjs.com/solid-start/guides/data-fetching
+
+Demonstrates fetching data on the client-side using SolidJS's `createResource` primitive. This approach is suitable for scenarios where data fetching should not occur during server-side rendering. It handles loading and error states using `Suspense` and `ErrorBoundary`. The input is a URL to an API endpoint, and the output is a list of posts displayed as list items.
+
+```typescript
+// src/routes/index.tsx
+import { createResource, ErrorBoundary, Suspense, For } from "solid-js";
+
+
+export default function Page() {
+  const [posts] = createResource(async () => {
+    const posts = await fetch("https://my-api.com/posts");
+    return await posts.json();
+  });
+  return (
+    <ul>
+      <ErrorBoundary fallback={<div>Something went wrong!</div>}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <For each={posts()}>{(post) => <li>{post.title}</li>}</For>
+        </Suspense>
+      </ErrorBoundary>
+    </ul>
+  );
+}
+
+```
+
+```javascript
+// src/routes/index.jsx
+import { createResource, ErrorBoundary, Suspense, For } from "solid-js";
+
+
+export default function Page() {
+  const [posts] = createResource(async () => {
+    const posts = await fetch("https://my-api.com/posts");
+    return await posts.json();
+  });
+  return (
+    <ul>
+      <ErrorBoundary fallback={<div>Something went wrong!</div>}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <For each={posts()}>{(post) => <li>{post.title}</li>}</For>
+        </Suspense>
+      </ErrorBoundary>
+    </ul>
+  );
+}
+
+```
+
+--------------------------------
+
+### Client Mounting API
+
+Source: https://docs.solidjs.com/solid-start/reference/client/mount
+
+The `mount` function is the entry point for client-side Solid Start applications. It takes a function that returns the application's root element and a DOM element to mount it to. If server-side rendering (SSR) is enabled, it will hydrate the existing server-rendered HTML; otherwise, it will perform a full client-side render.
+
+```APIDOC
+## `mount` Function
+
+### Description
+Bootsraps a Solid Start application on the client. It determines whether to hydrate an existing server-rendered application or perform a full client-side render based on the SSR configuration.
+
+### Method
+`mount(fn, el)`
+
+### Parameters
+#### Function Parameter (`fn`)
+- **fn** (() => JSX.Element) - Required - A function that returns the root element of your SolidJS application.
+
+#### DOM Element Parameter (`el`)
+- **el** (MountableElement) - Required - The DOM element where the application will be mounted.
+
+### Request Example
+```typescript
+import { mount, StartClient } from "@solidjs/start/client";
+
+mount(() => <StartClient />, document.getElementById("app")!); 
+```
+
+### Response
+This function does not return a value. It is responsible for rendering or hydrating the application.
+
+### Notes
+- If `{ ssr: false }` is set in your Solid Start configuration, `mount` behaves identically to `render` (client-side rendering only).
+- This function is typically used in `entry-client.tsx`.
+```
+
+--------------------------------
+
+### defineConfig - Basic Vite Configuration
+
+Source: https://docs.solidjs.com/solid-start/reference/config/define-config
+
+The `defineConfig` helper from `@solidjs/start/config` is used in `app.config.ts` to configure SolidStart. This example shows basic Vite configuration.
+
+```APIDOC
+## POST /api/users
+
+### Description
+This endpoint creates a new user in the system.
+
+### Method
+POST
+
+### Endpoint
+/api/users
+
+### Parameters
+#### Request Body
+- **username** (string) - Required - The username for the new user.
+- **email** (string) - Required - The email address for the new user.
+- **password** (string) - Required - The password for the new user.
+
+### Request Example
+```json
+{
+  "username": "johndoe",
+  "email": "john.doe@example.com",
+  "password": "secretpassword"
+}
+```
+
+### Response
+#### Success Response (201)
+- **id** (string) - The unique identifier for the newly created user.
+- **username** (string) - The username of the created user.
+- **email** (string) - The email address of the created user.
+
+#### Response Example
+```json
+{
+  "id": "user-12345",
+  "username": "johndoe",
+  "email": "john.doe@example.com"
+}
+```
+```
+
+--------------------------------
+
+### Manage Request and Response Headers with Middleware (SolidStart)
+
+Source: https://docs.solidjs.com/solid-start/advanced/middleware
+
+This middleware example demonstrates accessing and modifying request and response headers using `event.request.headers` and `event.response.headers`. It shows reading the `user-agent` and setting custom headers. Requires `@solidjs/start/middleware`.
+
+```typescript
+import { createMiddleware } from "@solidjs/start/middleware";
+
+
+export default createMiddleware({
+  onRequest: (event) => {
+    // Reading client metadata for later use
+    const userAgent = event.request.headers.get("user-agent");
+    // Adding custom headers to request/response
+    event.request.headers.set("x-custom-request-header", "hello");
+    event.response.headers.set("x-custom-response-header1", "hello");
+  },
+  onBeforeResponse: (event) => {
+    // Finalizing response headers before sending to client
+    event.response.headers.set("x-custom-response-header2", "hello");
+  },
+});
+```
+
+--------------------------------
+
+### Importing CSS in SolidStart Components
+
+Source: https://docs.solidjs.com/solid-start/building-your-application/css-and-styling
+
+Demonstrates how to import and use CSS files directly within SolidStart components. This method is suitable for global or shared styles.
+
+```css
+.card {
+  background-color: #446b9e;
+}
+
+h1 {
+  font-size: 1.5em;
+  font-weight: bold;
+}
+
+p {
+  font-size: 1em;
+  font-weight: normal;
+}
+```
+
+```tsx
+import "./Card.css";
+
+
+const Card = (props) => {
+  return (
+    <div class="card">
+      <h1>{props.title}</h1>
+      <p>{props.text}</p>
+    </div>
+  );
+};
+
+```
+
+--------------------------------
+
+### Fetch Products by Category and Brand in SolidStart API Route
+
+Source: https://docs.solidjs.com/solid-start/building-your-application/api-routes
+
+An example of a SolidStart API route that handles GET requests to retrieve products based on category and brand parameters. It imports an APIEvent type and a local store module to fetch and return product data as JSON.
+
+```typescript
+import type { APIEvent } from "@solidjs/start/server";
+import store from "./store";
+
+
+export async function GET({ params }: APIEvent) {
+  console.log(`Category: ${params.category}, Brand: ${params.brand}`);
+  const products = await store.getProducts(params.category, params.brand);
+  return products;
+}
+```
+
+--------------------------------
+
+### defineConfig - Nitro Configuration (Netlify Edge Provider)
+
+Source: https://docs.solidjs.com/solid-start/reference/config/define-config
+
+Example of configuring Nitro to use the Netlify Edge preset for deployment.
+
+```APIDOC
+## DELETE /api/users/{id}
+
+### Description
+Deletes a user from the system.
+
+### Method
+DELETE
+
+### Endpoint
+/api/users/{id}
+
+### Parameters
+#### Path Parameters
+- **id** (string) - Required - The unique identifier of the user to delete.
+
+### Response
+#### Success Response (204)
+- No content is returned on successful deletion.
+
+#### Response Example
+(No response body)
+```
+
+--------------------------------
+
+### SolidJS Counter Component Example
+
+Source: https://docs.solidjs.com/solid-start/index
+
+A simple SolidJS component demonstrating fine-grained reactivity using createSignal. It displays a counter that increments when the button is clicked. This component is a basic example of how to manage state within a SolidJS application.
+
+```jsx
+import { createSignal } from "solid-js";
+
+function Counter() {
+	const [count, setCount] = createSignal(0);
+
+	return (
+		<button
+		  onClick={() => setCount((n) => n + 1)}>
+		  Count: {count()}
+		</button>
+	);
+}
+```
+
+--------------------------------
+
+### Configure Vite for Different Routers in SolidStart
+
+Source: https://docs.solidjs.com/solid-start/reference/config/define-config
+
+This example demonstrates how to dynamically configure Vite options based on the router type ('server', 'client', 'server-function') using a function for the 'vite' option in defineConfig.
+
+```typescript
+import { defineConfig } from "@solidjs/start/config";
+
+
+export default defineConfig({
+  vite({ router }) {
+    if (router === "server") {
+    } else if (router === "client") {
+    } else if (router === "server-function") {
+    }
+    return { plugins: [] };
+  },
+});
+```
+
+--------------------------------
+
+### Define HTTP Method Handlers for API Routes in SolidStart
+
+Source: https://docs.solidjs.com/solid-start/building-your-application/api-routes
+
+Example of defining individual HTTP method handlers (GET, POST, PATCH, DELETE) for an API route in SolidStart. These functions will be exported directly to handle corresponding requests. The handler functions receive an APIEvent object containing request details.
+
+```typescript
+export function GET() {
+  // ...
+}
+
+export function POST() {
+  // ...
+}
+
+export function PATCH() {
+  // ...
+}
+
+export function DELETE() {
+  // ...
+}
+```
+
+--------------------------------
+
+### Preload Route Data in SolidStart (TypeScript/JavaScript)
+
+Source: https://docs.solidjs.com/solid-start/guides/data-fetching
+
+Demonstrates how to export a route object with a `preload` function to fetch data before a route renders. This function runs the query, and the data can be accessed using `createAsync` in the component. It requires the `@solidjs/router` package.
+
+```typescript
+// src/routes/index.tsx
+import { ErrorBoundary } from "solid-js";
+import { query, createAsync, type RouteDefinition } from "@solidjs/router";
+
+
+const getPosts = query(async () => {
+  const posts = await fetch("https://my-api.com/posts");
+  return await posts.json();
+}, "posts");
+
+
+export const route = {
+  preload: () => getPosts(),
+} satisfies RouteDefinition;
+
+
+export default function Page() {
+  const post = createAsync(() => getPosts());
   return (
     <div>
-      <button onClick={() => setUserId(id => String(Number(id) + 1))}>
-        Next User
-      </button>
-      <button onClick={() => refetch()}>Refresh</button>
-
-      <ErrorBoundary fallback={(err) => <div>Error: {err.message}</div>}>
-        <Suspense fallback={<div>Loading user...</div>}>
-          <div>
-            <h2>{user().name}</h2>
-            <p>{user().email}</p>
-          </div>
-        </Suspense>
+      <ErrorBoundary fallback={<div>Something went wrong!</div>}>
+        <h1>{post().title}</h1>
       </ErrorBoundary>
     </div>
   );
 }
 
-render(() => <UserProfile />, document.getElementById("app")!);
 ```
 
-### createStore - Manage nested reactive state
+```javascript
+// src/routes/index.jsx
+import { ErrorBoundary } from "solid-js";
+import { query, createAsync } from "@solidjs/router";
 
-Creates a proxy-based store for managing complex nested state. Unlike signals, stores allow fine-grained reactivity for individual properties and nested objects. Use the setter with path syntax to update specific parts of the state tree.
 
-```typescript
-import { createStore } from "solid-js/store";
-import { createEffect } from "solid-js";
+const getPosts = query(async () => {
+  const posts = await fetch("https://my-api.com/posts");
+  return await posts.json();
+}, "posts");
 
-// Create a store with nested data
-const [state, setState] = createStore({
-  user: {
-    name: "John",
-    age: 30,
-    settings: {
-      theme: "dark",
-      notifications: true
-    }
-  },
-  todos: [
-    { id: 1, text: "Learn Solid", done: false },
-    { id: 2, text: "Build app", done: false }
-  ]
-});
 
-// Fine-grained updates - only affects specific property
-setState("user", "name", "Jane");
-setState("user", "age", age => age + 1);
-
-// Nested property updates
-setState("user", "settings", "theme", "light");
-
-// Array updates
-setState("todos", 0, "done", true);
-setState("todos", todos => [...todos, { id: 3, text: "Deploy", done: false }]);
-
-// Bulk updates with produce pattern
-import { produce } from "solid-js/store";
-
-setState(
-  produce((state) => {
-    state.user.age += 1;
-    state.todos.push({ id: 4, text: "Test", done: false });
-  })
-);
-
-// Fine-grained reactivity tracks individual properties
-createEffect(() => {
-  console.log("User name:", state.user.name);
-  // Only runs when state.user.name changes, not other properties
-});
-
-createEffect(() => {
-  console.log("Theme:", state.user.settings.theme);
-  // Only runs when theme changes
-});
-
-// Array reconciliation with keys
-setState("todos", (todo) => todo.id === 1, "done", true);
-
-// Unwrap store to get raw object
-import { unwrap } from "solid-js/store";
-const rawState = unwrap(state);
-console.log(rawState); // Plain JavaScript object
-
-// Modifiers for special operations
-import { reconcile } from "solid-js/store";
-
-// Replace entire object while preserving references where possible
-const newData = { user: { name: "Bob", age: 25, settings: { theme: "dark", notifications: false } }, todos: [] };
-setState(reconcile(newData));
-
-// Mutable modifier for efficient batch updates
-import { modifyMutable } from "solid-js/store";
-
-setState("todos", modifyMutable(todos => {
-  todos.forEach(todo => todo.done = false);
-  todos.push({ id: 5, text: "Review", done: false });
-}));
-```
-
-## Component Utilities
-
-### createContext and useContext - Share state across component tree
-
-Creates a Context for dependency injection and state management across component boundaries without prop drilling. Provider components pass values down the tree, and child components access them with useContext.
-
-```typescript
-import { createContext, useContext, createSignal, ParentComponent } from "solid-js";
-import { render } from "solid-js/web";
-
-// Create context with default value
-interface ThemeContextValue {
-  theme: () => string;
-  setTheme: (theme: string) => void;
-}
-
-const ThemeContext = createContext<ThemeContextValue>({
-  theme: () => "light",
-  setTheme: () => {}
-});
-
-// Provider component
-const ThemeProvider: ParentComponent = (props) => {
-  const [theme, setTheme] = createSignal("light");
-
-  const value: ThemeContextValue = {
-    theme,
-    setTheme
-  };
-
-  return (
-    <ThemeContext.Provider value={value}>
-      {props.children}
-    </ThemeContext.Provider>
-  );
+export const route = {
+  preload: () => getPosts(),
 };
 
-// Consumer components
-function ThemeToggle() {
-  const { theme, setTheme } = useContext(ThemeContext);
 
-  return (
-    <button onClick={() => setTheme(theme() === "light" ? "dark" : "light")}>
-      Current: {theme()}
-    </button>
-  );
-}
-
-function ThemedPanel() {
-  const { theme } = useContext(ThemeContext);
-
-  return (
-    <div style={{ background: theme() === "light" ? "#fff" : "#333" }}>
-      <h1>Themed Content</h1>
-      <ThemeToggle />
-    </div>
-  );
-}
-
-// App with nested providers
-function App() {
-  return (
-    <ThemeProvider>
-      <ThemedPanel />
-    </ThemeProvider>
-  );
-}
-
-render(() => <App />, document.getElementById("app")!);
-
-// Multiple contexts with composition
-interface UserContextValue {
-  user: () => { name: string; id: string } | null;
-  login: (name: string) => void;
-  logout: () => void;
-}
-
-const UserContext = createContext<UserContextValue>();
-
-function UserProvider(props: { children: any }) {
-  const [user, setUser] = createSignal<{ name: string; id: string } | null>(null);
-
-  const login = (name: string) => {
-    setUser({ name, id: Math.random().toString() });
-  };
-
-  const logout = () => {
-    setUser(null);
-  };
-
-  return (
-    <UserContext.Provider value={{ user, login, logout }}>
-      {props.children}
-    </UserContext.Provider>
-  );
-}
-
-function Profile() {
-  const userContext = useContext(UserContext);
-  if (!userContext) throw new Error("Profile must be used within UserProvider");
-
-  const { user, logout } = userContext;
-
-  return (
-    <Show when={user()} fallback={<div>Not logged in</div>}>
-      {(u) => (
-        <div>
-          <p>Welcome, {u().name}!</p>
-          <button onClick={logout}>Logout</button>
-        </div>
-      )}
-    </Show>
-  );
-}
-```
-
-### mergeProps - Merge multiple prop objects reactively
-
-Merges multiple prop objects with reactive tracking. Later props override earlier ones. Useful for implementing default props or combining multiple prop sources while maintaining reactivity.
-
-```typescript
-import { mergeProps, createSignal, Component } from "solid-js";
-
-// Component with default props
-interface ButtonProps {
-  text?: string;
-  variant?: "primary" | "secondary";
-  disabled?: boolean;
-  onClick?: () => void;
-}
-
-const Button: Component<ButtonProps> = (props) => {
-  const merged = mergeProps(
-    { text: "Click me", variant: "primary" as const, disabled: false },
-    props
-  );
-
-  return (
-    <button
-      class={`btn btn-${merged.variant}`}
-      disabled={merged.disabled}
-      onClick={merged.onClick}
-    >
-      {merged.text}
-    </button>
-  );
-};
-
-// Usage - overrides only specified props
-<Button text="Submit" variant="secondary" />
-
-// Reactive merging with signals
-const [config, setConfig] = createSignal({ color: "blue", size: "medium" });
-const [overrides, setOverrides] = createSignal({ size: "large" });
-
-const merged = mergeProps(config, overrides);
-console.log(merged.color); // "blue"
-console.log(merged.size); // "large"
-
-setOverrides({ size: "small", color: "red" });
-console.log(merged.color); // "red" (override)
-console.log(merged.size); // "small"
-
-// Merge multiple sources
-const defaults = { a: 1, b: 2, c: 3 };
-const user = { b: 20 };
-const system = { c: 300 };
-
-const final = mergeProps(defaults, user, system);
-console.log(final); // { a: 1, b: 20, c: 300 }
-```
-
-### splitProps - Split props into multiple objects
-
-Splits a props object into multiple objects based on specified keys. Maintains reactivity for all split objects. Useful for separating component-specific props from DOM attributes.
-
-```typescript
-import { splitProps, Component, JSX } from "solid-js";
-
-interface InputProps extends JSX.InputHTMLAttributes<HTMLInputElement> {
-  label?: string;
-  error?: string;
-  helperText?: string;
-}
-
-const Input: Component<InputProps> = (props) => {
-  const [local, input] = splitProps(
-    props,
-    ["label", "error", "helperText"]
-  );
-
-  return (
-    <div class="input-wrapper">
-      {local.label && <label>{local.label}</label>}
-      <input
-        {...input}
-        class={local.error ? "input-error" : "input"}
-      />
-      {local.error && <span class="error">{local.error}</span>}
-      {local.helperText && <span class="helper">{local.helperText}</span>}
-    </div>
-  );
-};
-
-// Usage with mixed props
-<Input
-  label="Email"
-  type="email"
-  placeholder="Enter your email"
-  helperText="We'll never share your email"
-  required
-/>
-
-// Split into multiple groups
-interface CardProps extends JSX.HTMLAttributes<HTMLDivElement> {
-  title: string;
-  subtitle?: string;
-  footer?: JSX.Element;
-  variant?: "outlined" | "filled";
-}
-
-const Card: Component<CardProps> = (props) => {
-  const [card, div] = splitProps(
-    props,
-    ["title", "subtitle", "footer", "variant"]
-  );
-
-  return (
-    <div {...div} class={`card card-${card.variant || "filled"}`}>
-      <div class="card-header">
-        <h3>{card.title}</h3>
-        {card.subtitle && <p>{card.subtitle}</p>}
-      </div>
-      <div class="card-body">{props.children}</div>
-      {card.footer && <div class="card-footer">{card.footer}</div>}
-    </div>
-  );
-};
-
-// Three-way split
-const [style, events, other] = splitProps(
-  props,
-  ["class", "style"],
-  ["onClick", "onMouseEnter", "onMouseLeave"]
-);
-```
-
-### lazy - Lazy load components
-
-Dynamically imports components with code splitting. Returns a component wrapper that loads the actual component on first render. Integrates with Suspense for loading states.
-
-```typescript
-import { lazy, Suspense, Component } from "solid-js";
-import { render } from "solid-js/web";
-
-// Lazy load a component
-const HeavyChart = lazy(() => import("./components/HeavyChart"));
-const AdminPanel = lazy(() => import("./components/AdminPanel"));
-
-function Dashboard() {
+export default function Page() {
+  const post = createAsync(() => getPosts());
   return (
     <div>
-      <h1>Dashboard</h1>
-      <Suspense fallback={<div>Loading chart...</div>}>
-        <HeavyChart data={[1, 2, 3, 4, 5]} />
-      </Suspense>
+      <ErrorBoundary fallback={<div>Something went wrong!</div>}>
+        <h1>{post().title}</h1>
+      </ErrorBoundary>
     </div>
   );
 }
 
-// Conditional lazy loading with routing
-function App() {
-  const [route, setRoute] = createSignal("home");
+```
 
+--------------------------------
+
+### Use Server Functions with Database/ORM in SolidStart (TypeScript/JavaScript)
+
+Source: https://docs.solidjs.com/solid-start/guides/data-fetching
+
+Shows how to safely interact with a database or ORM within a query using server functions. The `"use server";` directive is crucial for marking the function as a server-side operation. This requires the `@solidjs/router` package and a `db` import.
+
+```typescript
+// src/routes/index.tsx
+import { For, ErrorBoundary } from "solid-js";
+import { query, createAsync, type RouteDefinition } from "@solidjs/router";
+import { db } from "~/lib/db";
+
+
+const getPosts = query(async () => {
+  "use server";
+  return await db.from("posts").select();
+}, "posts");
+
+
+export const route = {
+  preload: () => getPosts(),
+} satisfies RouteDefinition;
+
+
+export default function Page() {
+  const posts = createAsync(() => getPosts());
   return (
-    <div>
-      <nav>
-        <button onClick={() => setRoute("home")}>Home</button>
-        <button onClick={() => setRoute("admin")}>Admin</button>
-      </nav>
-
-      <Suspense fallback={<div>Loading page...</div>}>
-        <Switch>
-          <Match when={route() === "home"}>
-            <div>Home Page</div>
-          </Match>
-          <Match when={route() === "admin"}>
-            <AdminPanel />
-          </Match>
-        </Switch>
-      </Suspense>
-    </div>
+    <ul>
+      <ErrorBoundary fallback={<div>Something went wrong!</div>}>
+        <For each={posts()}>{(post) => <li>{post.title}</li>}</For>
+      </ErrorBoundary>
+    </ul>
   );
 }
 
-// Preload component before rendering
-const ExpensiveComponent = lazy(() => import("./Expensive"));
+```
 
-function Toolbar() {
+```javascript
+// src/routes/index.jsx
+import { For, ErrorBoundary } from "solid-js";
+import { query, createAsync } from "@solidjs/router";
+import { db } from "~/lib/db";
+
+
+const getPosts = query(async () => {
+  "use server";
+  return await db.from("posts").select();
+}, "posts");
+
+
+export const route = {
+  preload: () => getPosts(),
+};
+
+
+export default function Page() {
+  const posts = createAsync(() => getPosts());
   return (
-    <button
-      onMouseEnter={() => ExpensiveComponent.preload()}
-      onClick={() => showComponent()}
-    >
-      Show Component (preloaded on hover)
-    </button>
+    <ul>
+      <ErrorBoundary fallback={<div>Something went wrong!</div>}>
+        <For each={posts()}>{(post) => <li>{post.title}</li>}</For>
+      </ErrorBoundary>
+    </ul>
   );
 }
 
-// Nested lazy loading with error handling
-function ComplexApp() {
+```
+
+--------------------------------
+
+### Pass Additional Arguments to SolidStart Actions (JavaScript)
+
+Source: https://docs.solidjs.com/solid-start/guides/data-mutation
+
+Demonstrates passing additional arguments to SolidStart actions in plain JavaScript using the `with` method. This example passes a `userId` along with form data to the `addPost` action. Requires `@solidjs/router`.
+
+```javascript
+// src/routes/index.jsx
+import { action } from "@solidjs/router";
+
+
+const addPost = action(async (userId, formData) => {
+  const title = formData.get("title");
+  await fetch("https://my-api.com/posts", {
+    method: "POST",
+    body: JSON.stringify({ userId, title }),
+  });
+}, "addPost");
+
+
+export default function Page() {
+  const userId = 1;
   return (
-    <ErrorBoundary
-      fallback={(err) => <div>Failed to load: {err.message}</div>}
-    >
+    <form action={addPost.with(userId)} method="post">
+      <input name="title" />
+      <button>Add Post</button>
+    </form>
+  );
+}
+
+```
+
+--------------------------------
+
+### Show Loading UI During Data Fetching in SolidStart (TypeScript/JavaScript)
+
+Source: https://docs.solidjs.com/solid-start/guides/data-fetching
+
+Demonstrates how to display a loading indicator while data is being fetched in SolidStart. It utilizes the `Suspense` component from `solid-js` to wrap the data rendering and provide a fallback UI. Requires `solid-js` and `@solidjs/router`.
+
+```typescript
+// src/routes/index.tsx
+import { Suspense, For } from "solid-js";
+import { query, createAsync } from "@solidjs/router";
+
+
+const getPosts = query(async () => {
+  const posts = await fetch("https://my-api.com/posts");
+  return await posts.json();
+}, "posts");
+
+
+export default function Page() {
+  const posts = createAsync(() => getPosts());
+  return (
+    <ul>
       <Suspense fallback={<div>Loading...</div>}>
-        <LazySection />
+        <For each={posts()}>{(post) => <li>{post.title}</li>}</For>
       </Suspense>
-    </ErrorBoundary>
+    </ul>
   );
 }
 
-const LazySection = lazy(() => import("./Section"));
-
-render(() => <App />, document.getElementById("app")!);
 ```
 
-## Control Flow Components
+```javascript
+// src/routes/index.jsx
+import { Suspense, For } from "solid-js";
+import { query, createAsync } from "@solidjs/router";
 
-### For - Keyed list rendering with item identity
 
-Renders a list by iterating over each item with referential keying. Each item maintains its identity based on reference equality. Use when list items are objects that maintain their identity across updates.
+const getPosts = query(async () => {
+  const posts = await fetch("https://my-api.com/posts");
+  return await posts.json();
+}, "posts");
 
-```typescript
-import { For, createSignal } from "solid-js";
 
-interface Todo {
-  id: number;
-  text: string;
-  done: boolean;
-}
-
-function TodoList() {
-  const [todos, setTodos] = createSignal<Todo[]>([
-    { id: 1, text: "Learn Solid", done: false },
-    { id: 2, text: "Build app", done: false },
-    { id: 3, text: "Deploy", done: true }
-  ]);
-
-  const addTodo = () => {
-    setTodos(prev => [...prev, {
-      id: Date.now(),
-      text: `Todo ${prev.length + 1}`,
-      done: false
-    }]);
-  };
-
-  const toggleTodo = (id: number) => {
-    setTodos(prev => prev.map(todo =>
-      todo.id === id ? { ...todo, done: !todo.done } : todo
-    ));
-  };
-
-  const removeTodo = (id: number) => {
-    setTodos(prev => prev.filter(todo => todo.id !== id));
-  };
-
+export default function Page() {
+  const posts = createAsync(() => getPosts());
   return (
-    <div>
-      <button onClick={addTodo}>Add Todo</button>
-      <ul>
-        <For each={todos()} fallback={<div>No todos yet</div>}>
-          {(todo, index) => (
-            <li style={{ "text-decoration": todo.done ? "line-through" : "none" }}>
-              <span>{index() + 1}. {todo.text}</span>
-              <button onClick={() => toggleTodo(todo.id)}>Toggle</button>
-              <button onClick={() => removeTodo(todo.id)}>Delete</button>
-            </li>
-          )}
-        </For>
-      </ul>
-    </div>
+    <ul>
+      <Suspense fallback={<div>Loading...</div>}>
+        <For each={posts()}>{(post) => <li>{post.title}</li>}</For>
+      </Suspense>
+    </ul>
   );
 }
 
-// Nested For loops
-function Grid() {
-  const [rows, setRows] = createSignal([
-    { id: 1, cells: ["A1", "A2", "A3"] },
-    { id: 2, cells: ["B1", "B2", "B3"] },
-    { id: 3, cells: ["C1", "C2", "C3"] }
-  ]);
+```
 
-  return (
-    <table>
-      <tbody>
-        <For each={rows()}>
-          {(row) => (
-            <tr>
-              <For each={row.cells}>
-                {(cell) => <td>{cell}</td>}
-              </For>
-            </tr>
-          )}
-        </For>
-      </tbody>
-    </table>
-  );
+--------------------------------
+
+### Setting Headers for Catch-all Routes
+
+Source: https://docs.solidjs.com/solid-start/reference/server/http-header
+
+You can use HttpHeader within catch-all routes to set specific headers, for example, when returning a 404 status.
+
+```APIDOC
+## GET /:catchall
+
+### Description
+Sets a custom header 'my-header' with the value 'header-value' for catch-all routes, typically used for 404 pages.
+
+### Method
+GET
+
+### Endpoint
+/:catchall
+
+### Parameters
+#### Path Parameters
+- **catchall** (string) - Required - The catch-all path parameter.
+
+#### Request Body
+- **name** (string) - Required - The name of the header to set. Example: "my-header".
+- **value** (string) - Required - The value of the header to set. Example: "header-value".
+
+### Request Example
+```json
+{
+  "name": "my-header",
+  "value": "header-value"
 }
 ```
 
-### Index - Non-keyed list rendering with index identity
+### Response
+#### Success Response (404)
+- **message** (string) - Indicates the custom header was set.
 
-Renders a list by index position. Items are identified by their index, not by reference. Use when list values change frequently but positions are stable, or when items are primitives.
-
-```typescript
-import { Index, createSignal } from "solid-js";
-
-function ScoreBoard() {
-  const [scores, setScores] = createSignal([100, 95, 87, 82, 76]);
-
-  const incrementScore = (index: number) => {
-    setScores(prev => [
-      ...prev.slice(0, index),
-      prev[index] + 1,
-      ...prev.slice(index + 1)
-    ]);
-  };
-
-  return (
-    <div>
-      <h2>High Scores</h2>
-      <ol>
-        <Index each={scores()} fallback={<div>No scores</div>}>
-          {(score, index) => (
-            <li>
-              Player {index + 1}: {score()}
-              <button onClick={() => incrementScore(index)}>+1</button>
-            </li>
-          )}
-        </Index>
-      </ol>
-    </div>
-  );
-}
-
-// Index with primitive values
-function ColorPalette() {
-  const [colors, setColors] = createSignal([
-    "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", "#98D8C8"
-  ]);
-
-  const changeColor = (index: number) => {
-    const newColor = "#" + Math.floor(Math.random()*16777215).toString(16);
-    setColors(prev => [
-      ...prev.slice(0, index),
-      newColor,
-      ...prev.slice(index + 1)
-    ]);
-  };
-
-  return (
-    <div class="palette">
-      <Index each={colors()}>
-        {(color, i) => (
-          <div
-            class="color-swatch"
-            style={{ background: color() }}
-            onClick={() => changeColor(i)}
-          >
-            {color()}
-          </div>
-        )}
-      </Index>
-    </div>
-  );
-}
-
-// Performance comparison: Index vs For with primitives
-function NumbersList() {
-  const [numbers, setNumbers] = createSignal([1, 2, 3, 4, 5]);
-
-  // Better with Index - values change, not references
-  return (
-    <Index each={numbers()}>
-      {(num, index) => (
-        <div>
-          Position {index}: {num()}
-          <button onClick={() => {
-            setNumbers(prev => [
-              ...prev.slice(0, index),
-              num() * 2,
-              ...prev.slice(index + 1)
-            ]);
-          }}>
-            Double
-          </button>
-        </div>
-      )}
-    </Index>
-  );
+#### Response Example
+```json
+{
+  "message": "Header 'my-header' set to 'header-value'"
 }
 ```
-
-### Show - Conditional rendering with optional keying
-
-Conditionally renders children based on a truthy condition. Supports keyed mode for recreating content on change, or unkeyed mode for preserving content. Provides a callback pattern for accessing the condition value.
-
-```typescript
-import { Show, createSignal } from "solid-js";
-
-function UserGreeting() {
-  const [user, setUser] = createSignal<{ name: string; email: string } | null>(null);
-
-  return (
-    <div>
-      <Show
-        when={user()}
-        fallback={<div>Please log in</div>}
-      >
-        {(u) => (
-          <div>
-            <h1>Hello, {u().name}!</h1>
-            <p>Email: {u().email}</p>
-          </div>
-        )}
-      </Show>
-
-      <button onClick={() => setUser({ name: "John", email: "john@example.com" })}>
-        Login
-      </button>
-      <button onClick={() => setUser(null)}>Logout</button>
-    </div>
-  );
-}
-
-// Keyed mode - recreates content when condition changes
-function KeyedExample() {
-  const [userId, setUserId] = createSignal<string | null>("user-1");
-
-  return (
-    <Show when={userId()} keyed>
-      {(id) => {
-        console.log("Creating component for:", id);
-        // Component is recreated when userId changes
-        return <UserProfile userId={id} />;
-      }}
-    </Show>
-  );
-}
-
-// Unkeyed mode (default) - preserves content
-function UnkeyedExample() {
-  const [isVisible, setIsVisible] = createSignal(true);
-  const [count, setCount] = createSignal(0);
-
-  return (
-    <div>
-      <button onClick={() => setIsVisible(!isVisible())}>Toggle</button>
-      <Show when={isVisible()}>
-        <div>
-          <p>Count: {count()}</p>
-          <button onClick={() => setCount(c => c + 1)}>Increment</button>
-        </div>
-      </Show>
-    </div>
-  );
-}
-
-// Type narrowing with Show
-function DataDisplay() {
-  const [data, setData] = createSignal<string | number | null>(null);
-
-  return (
-    <div>
-      <Show when={typeof data() === "string"} fallback={<span>Not a string</span>}>
-        {(str) => <div>String value: {str()}</div>}
-      </Show>
-
-      <Show when={typeof data() === "number"} fallback={<span>Not a number</span>}>
-        {(num) => <div>Number value: {num()}</div>}
-      </Show>
-    </div>
-  );
-}
-
-function UserProfile(props: { userId: string }) {
-  return <div>Profile for {props.userId}</div>;
-}
 ```
 
-### Switch/Match - Multiple conditional branches
+--------------------------------
 
-Renders the first matching condition from multiple branches. Works like a switch statement but for JSX. Only evaluates conditions until one matches.
+### Pass Parameters to Route Queries in SolidStart (TypeScript/JavaScript)
 
-```typescript
-import { Switch, Match, createSignal } from "solid-js";
+Source: https://docs.solidjs.com/solid-start/guides/data-fetching
 
-function Router() {
-  const [route, setRoute] = createSignal<"home" | "about" | "contact" | "404">("home");
-
-  return (
-    <div>
-      <nav>
-        <button onClick={() => setRoute("home")}>Home</button>
-        <button onClick={() => setRoute("about")}>About</button>
-        <button onClick={() => setRoute("contact")}>Contact</button>
-      </nav>
-
-      <Switch fallback={<div>404 Not Found</div>}>
-        <Match when={route() === "home"}>
-          <div>
-            <h1>Home Page</h1>
-            <p>Welcome to our site!</p>
-          </div>
-        </Match>
-        <Match when={route() === "about"}>
-          <div>
-            <h1>About Us</h1>
-            <p>We are awesome!</p>
-          </div>
-        </Match>
-        <Match when={route() === "contact"}>
-          <div>
-            <h1>Contact</h1>
-            <p>Email: contact@example.com</p>
-          </div>
-        </Match>
-      </Switch>
-    </div>
-  );
-}
-
-// With value extraction (keyed mode)
-function StatusDisplay() {
-  const [status, setStatus] = createSignal<
-    | { type: "loading" }
-    | { type: "success"; data: any }
-    | { type: "error"; message: string }
-  >({ type: "loading" });
-
-  return (
-    <Switch>
-      <Match when={status().type === "loading"}>
-        <div>Loading...</div>
-      </Match>
-      <Match when={status().type === "success" && status()}>
-        {(s) => <div>Success: {JSON.stringify(s().data)}</div>}
-      </Match>
-      <Match when={status().type === "error" && status()}>
-        {(s) => <div>Error: {s().message}</div>}
-      </Match>
-    </Switch>
-  );
-}
-
-// Nested conditions
-function PermissionGate() {
-  const [user, setUser] = createSignal<{ role: "admin" | "user" | "guest" } | null>(null);
-  const [isLoading, setIsLoading] = createSignal(true);
-
-  return (
-    <Switch>
-      <Match when={isLoading()}>
-        <div>Checking permissions...</div>
-      </Match>
-      <Match when={!user()}>
-        <div>Please log in</div>
-      </Match>
-      <Match when={user()?.role === "admin"}>
-        <div>Admin Panel</div>
-      </Match>
-      <Match when={user()?.role === "user"}>
-        <div>User Dashboard</div>
-      </Match>
-      <Match when={user()?.role === "guest"}>
-        <div>Limited Access</div>
-      </Match>
-    </Switch>
-  );
-}
-```
-
-### ErrorBoundary - Catch and handle errors
-
-Catches JavaScript errors anywhere in the child component tree and displays a fallback UI. Prevents errors from crashing the entire app.
+Illustrates how to define query functions that accept parameters and pass route parameters to them during preloading and component rendering. The `preload` function receives `params` object. This requires the `@solidjs/router` package.
 
 ```typescript
-import { ErrorBoundary, createSignal } from "solid-js";
+// src/routes/posts/[id]/index.tsx
+import { ErrorBoundary } from "solid-js";
+import { query, createAsync, type RouteDefinition } from "@solidjs/router";
 
-function App() {
-  return (
-    <ErrorBoundary
-      fallback={(err, reset) => (
-        <div class="error-container">
-          <h1>Something went wrong</h1>
-          <p>{err.message}</p>
-          <button onClick={reset}>Try again</button>
-        </div>
-      )}
-    >
-      <BuggyComponent />
-    </ErrorBoundary>
-  );
-}
 
-// Component that might throw
-function BuggyComponent() {
-  const [count, setCount] = createSignal(0);
+const getPost = query(async (id: string) => {
+  const post = await fetch(`https://my-api.com/posts/${id}`);
+  return await post.json();
+}, "post");
 
-  if (count() > 5) {
-    throw new Error("Count exceeded maximum!");
-  }
 
+export const route = {
+  preload: ({ params }) => getPost(params.id),
+} satisfies RouteDefinition;
+
+
+export default function Page() {
+  const postId = 1;
+  const post = createAsync(() => getPost(postId));
   return (
     <div>
-      <p>Count: {count()}</p>
-      <button onClick={() => setCount(c => c + 1)}>Increment</button>
-    </div>
-  );
-}
-
-// Nested error boundaries for granular error handling
-function Dashboard() {
-  return (
-    <div>
-      <h1>Dashboard</h1>
-
-      <ErrorBoundary fallback={<div>Failed to load user widget</div>}>
-        <UserWidget />
-      </ErrorBoundary>
-
-      <ErrorBoundary fallback={<div>Failed to load stats widget</div>}>
-        <StatsWidget />
-      </ErrorBoundary>
-
-      <ErrorBoundary fallback={<div>Failed to load chart widget</div>}>
-        <ChartWidget />
+      <ErrorBoundary fallback={<div>Something went wrong!</div>}>
+        <h1>{post().title}</h1>
       </ErrorBoundary>
     </div>
   );
 }
 
-// Error boundary with logging
-function LoggingErrorBoundary(props: { children: any }) {
-  return (
-    <ErrorBoundary
-      fallback={(err, reset) => {
-        console.error("Caught error:", err);
-
-        // Send to error tracking service
-        sendToErrorTracker({
-          message: err.message,
-          stack: err.stack,
-          timestamp: Date.now()
-        });
-
-        return (
-          <div>
-            <h2>Oops! Something went wrong</h2>
-            <details>
-              <summary>Error details</summary>
-              <pre>{err.stack}</pre>
-            </details>
-            <button onClick={reset}>Reload</button>
-          </div>
-        );
-      }}
-    >
-      {props.children}
-    </ErrorBoundary>
-  );
-}
-
-function sendToErrorTracker(error: any) {
-  console.log("Sending to error tracker:", error);
-}
-
-function UserWidget() { return <div>User Widget</div>; }
-function StatsWidget() { return <div>Stats Widget</div>; }
-function ChartWidget() { return <div>Chart Widget</div>; }
 ```
 
-### Suspense - Handle async loading states
+```javascript
+// src/routes/posts/[id]/index.jsx
+import { ErrorBoundary } from "solid-js";
+import { query, createAsync } from "@solidjs/router";
 
-Shows a fallback while waiting for async operations (resources, lazy components) to resolve. Coordinates multiple async operations and displays a single loading state.
 
-```typescript
-import { Suspense, createResource, lazy } from "solid-js";
-import { render } from "solid-js/web";
+const getPost = query(async (id) => {
+  const post = await fetch(`https://my-api.com/posts/${id}`);
+  return await post.json();
+}, "post");
 
-function App() {
-  const [user] = createResource(fetchUser);
-  const [posts] = createResource(fetchPosts);
 
+export const route = {
+  preload: ({ params }) => getPost(params.id),
+};
+
+
+export default function Page() {
+  const postId = 1;
+  const post = createAsync(() => getPost(postId));
   return (
     <div>
-      <h1>My App</h1>
-
-      {/* Single Suspense for multiple resources */}
-      <Suspense fallback={<div>Loading user and posts...</div>}>
-        <UserProfile user={user()} />
-        <PostsList posts={posts()} />
-      </Suspense>
+      <ErrorBoundary fallback={<div>Something went wrong!</div>}>
+        <h1>{post().title}</h1>
+      </ErrorBoundary>
     </div>
   );
 }
 
-// Nested Suspense boundaries
-function Dashboard() {
-  return (
-    <div>
-      <Suspense fallback={<div>Loading header...</div>}>
-        <Header />
-      </Suspense>
-
-      <Suspense fallback={<div>Loading main content...</div>}>
-        <MainContent />
-
-        <Suspense fallback={<div>Loading sidebar...</div>}>
-          <Sidebar />
-        </Suspense>
-      </Suspense>
-    </div>
-  );
-}
-
-// With lazy components
-const HeavyComponent = lazy(() => import("./HeavyComponent"));
-
-function LazyExample() {
-  const [show, setShow] = createSignal(false);
-
-  return (
-    <div>
-      <button onClick={() => setShow(true)}>Load Component</button>
-
-      <Show when={show()}>
-        <Suspense fallback={<div>Loading component...</div>}>
-          <HeavyComponent />
-        </Suspense>
-      </Show>
-    </div>
-  );
-}
-
-// Custom loading state
-function CustomLoader() {
-  return (
-    <div class="loader">
-      <div class="spinner"></div>
-      <p>Please wait...</p>
-    </div>
-  );
-}
-
-function AppWithCustomLoader() {
-  const [data] = createResource(fetchData);
-
-  return (
-    <Suspense fallback={<CustomLoader />}>
-      <DataDisplay data={data()} />
-    </Suspense>
-  );
-}
-
-async function fetchUser() {
-  const response = await fetch("https://api.example.com/user");
-  return response.json();
-}
-
-async function fetchPosts() {
-  const response = await fetch("https://api.example.com/posts");
-  return response.json();
-}
-
-async function fetchData() {
-  const response = await fetch("https://api.example.com/data");
-  return response.json();
-}
-
-function UserProfile(props: { user: any }) {
-  return <div>User: {props.user.name}</div>;
-}
-
-function PostsList(props: { posts: any[] }) {
-  return <ul><For each={props.posts}>{post => <li>{post.title}</li>}</For></ul>;
-}
-
-function Header() { return <header>Header</header>; }
-function MainContent() { return <main>Main</main>; }
-function Sidebar() { return <aside>Sidebar</aside>; }
-function DataDisplay(props: { data: any }) { return <div>{JSON.stringify(props.data)}</div>; }
-
-render(() => <App />, document.getElementById("app")!);
 ```
 
-## Rendering and Lifecycle
+--------------------------------
 
-### render - Mount application to DOM
+### Pass Additional Arguments to SolidStart Actions (TypeScript)
 
-Mounts a Solid application to a DOM element. Creates the reactive root and initializes the component tree. Returns a disposal function to clean up the application.
+Source: https://docs.solidjs.com/solid-start/guides/data-mutation
+
+Demonstrates passing additional arguments to SolidStart actions using the `with` method. This example passes a `userId` along with form data to the `addPost` action. Requires `@solidjs/router`.
 
 ```typescript
-import { render } from "solid-js/web";
-import { createSignal } from "solid-js";
+// src/routes/index.tsx
+import { action } from "@solidjs/router";
 
-function App() {
-  const [count, setCount] = createSignal(0);
 
+const addPost = action(async (userId: number, formData: FormData) => {
+  const title = formData.get("title") as string;
+  await fetch("https://my-api.com/posts", {
+    method: "POST",
+    body: JSON.stringify({ userId, title }),
+  });
+}, "addPost");
+
+
+export default function Page() {
+  const userId = 1;
   return (
-    <div>
-      <h1>Count: {count()}</h1>
-      <button onClick={() => setCount(c => c + 1)}>Increment</button>
-    </div>
+    <form action={addPost.with(userId)} method="post">
+      <input name="title" />
+      <button>Add Post</button>
+    </form>
   );
 }
 
-// Basic render
-const dispose = render(() => <App />, document.getElementById("app")!);
-
-// Manual disposal (cleanup)
-// dispose();
-
-// Multiple independent apps
-render(() => <Header />, document.getElementById("header")!);
-render(() => <MainContent />, document.getElementById("main")!);
-render(() => <Footer />, document.getElementById("footer")!);
-
-// Conditional rendering
-const mountPoint = document.getElementById("app");
-if (mountPoint) {
-  render(() => <App />, mountPoint);
-} else {
-  console.error("Mount point not found");
-}
-
-// Re-render on route change
-let currentDispose: (() => void) | null = null;
-
-function navigate(route: string) {
-  if (currentDispose) currentDispose();
-
-  const component = getComponentForRoute(route);
-  currentDispose = render(
-    () => component,
-    document.getElementById("app")!
-  );
-}
-
-function getComponentForRoute(route: string) {
-  return <div>Route: {route}</div>;
-}
-
-function Header() { return <header>Header</header>; }
-function MainContent() { return <main>Main</main>; }
-function Footer() { return <footer>Footer</footer>; }
 ```
 
-### hydrate - Hydrate server-rendered HTML
+--------------------------------
 
-Attaches event listeners and reactivity to server-rendered HTML. Used for SSR applications to make static HTML interactive without re-rendering.
+### Configure Cloudflare Module with Nitro in SolidStart
 
-```typescript
-import { hydrate } from "solid-js/web";
-import { createSignal } from "solid-js";
+Source: https://docs.solidjs.com/solid-start/reference/config/define-config
 
-function App() {
-  const [count, setCount] = createSignal(0);
-
-  return (
-    <div>
-      <h1>Count: {count()}</h1>
-      <button onClick={() => setCount(c => c + 1)}>Increment</button>
-    </div>
-  );
-}
-
-// Hydrate server-rendered content
-hydrate(() => <App />, document.getElementById("app")!);
-
-// With data loaded from server
-interface ServerData {
-  user: { name: string; id: string };
-  posts: any[];
-}
-
-declare global {
-  interface Window {
-    __INITIAL_DATA__: ServerData;
-  }
-}
-
-function AppWithData() {
-  const initialData = window.__INITIAL_DATA__;
-  const [user] = createSignal(initialData.user);
-  const [posts] = createSignal(initialData.posts);
-
-  return (
-    <div>
-      <h1>Welcome, {user().name}!</h1>
-      <PostsList posts={posts()} />
-    </div>
-  );
-}
-
-hydrate(() => <AppWithData />, document.getElementById("app")!);
-
-function PostsList(props: { posts: any[] }) {
-  return <ul><For each={props.posts}>{post => <li>{post.title}</li>}</For></ul>;
-}
-```
-
-### onMount - Run effect once on mount
-
-Executes a function once after the component is first created and inserted into the DOM. Does not track dependencies or re-run.
+This example shows the specific configuration required for Cloudflare Workers/Pages using 'cloudflare_module' preset, including rollupConfig for external dependencies like async_hooks.
 
 ```typescript
-import { onMount, createSignal } from "solid-js";
+import { defineConfig } from "@solidjs/start/config";
 
-function AutoFocusInput() {
-  let inputRef: HTMLInputElement | undefined;
 
-  onMount(() => {
-    inputRef?.focus();
-    console.log("Input mounted and focused");
-  });
-
-  return <input ref={inputRef} type="text" placeholder="Auto-focused" />;
-}
-
-// Data fetching on mount
-function UserProfile() {
-  const [user, setUser] = createSignal<any>(null);
-  const [loading, setLoading] = createSignal(true);
-
-  onMount(async () => {
-    try {
-      const response = await fetch("https://api.example.com/user");
-      const data = await response.json();
-      setUser(data);
-    } catch (error) {
-      console.error("Failed to fetch user:", error);
-    } finally {
-      setLoading(false);
-    }
-  });
-
-  return (
-    <Show when={!loading()} fallback={<div>Loading...</div>}>
-      <div>User: {user()?.name}</div>
-    </Show>
-  );
-}
-
-// Initialize third-party library
-function MapComponent() {
-  let mapContainer: HTMLDivElement | undefined;
-
-  onMount(() => {
-    const map = new Map(mapContainer!, {
-      center: [0, 0],
-      zoom: 10
-    });
-
-    console.log("Map initialized:", map);
-  });
-
-  return <div ref={mapContainer} style={{ width: "100%", height: "400px" }}></div>;
-}
-
-class Map {
-  constructor(element: HTMLElement, options: any) {}
-}
-```
-
-### onCleanup - Register cleanup function
-
-Registers a function to run when the reactive scope is disposed or before the effect re-runs. Use for cleanup like removing event listeners, canceling timers, or closing connections.
-
-```typescript
-import { createEffect, onCleanup, createSignal } from "solid-js";
-
-function Timer() {
-  const [count, setCount] = createSignal(0);
-  const [isRunning, setIsRunning] = createSignal(false);
-
-  createEffect(() => {
-    if (!isRunning()) return;
-
-    const interval = setInterval(() => {
-      setCount(c => c + 1);
-    }, 1000);
-
-    onCleanup(() => {
-      clearInterval(interval);
-      console.log("Timer cleaned up");
-    });
-  });
-
-  return (
-    <div>
-      <p>Count: {count()}</p>
-      <button onClick={() => setIsRunning(!isRunning())}>
-        {isRunning() ? "Stop" : "Start"}
-      </button>
-    </div>
-  );
-}
-
-// Event listener cleanup
-function ClickTracker() {
-  const [clicks, setClicks] = createSignal(0);
-
-  createEffect(() => {
-    const handleClick = () => setClicks(c => c + 1);
-    document.addEventListener("click", handleClick);
-
-    onCleanup(() => {
-      document.removeEventListener("click", handleClick);
-      console.log("Removed click listener");
-    });
-  });
-
-  return <div>Document clicks: {clicks()}</div>;
-}
-
-// WebSocket cleanup
-function LiveFeed() {
-  const [messages, setMessages] = createSignal<string[]>([]);
-  const [connected, setConnected] = createSignal(false);
-
-  createEffect(() => {
-    if (!connected()) return;
-
-    const ws = new WebSocket("wss://example.com/feed");
-
-    ws.onmessage = (event) => {
-      setMessages(prev => [...prev, event.data]);
-    };
-
-    onCleanup(() => {
-      ws.close();
-      console.log("WebSocket closed");
-    });
-  });
-
-  return (
-    <div>
-      <button onClick={() => setConnected(!connected())}>
-        {connected() ? "Disconnect" : "Connect"}
-      </button>
-      <ul>
-        <For each={messages()}>
-          {(msg) => <li>{msg}</li>}
-        </For>
-      </ul>
-    </div>
-  );
-}
-```
-
-## Advanced Reactivity
-
-### createRoot - Create isolated reactive scope
-
-Creates an independent reactive root that doesn't auto-dispose. Use for creating reactive contexts outside of components or for manual lifetime management.
-
-```typescript
-import { createRoot, createSignal, createEffect } from "solid-js";
-
-// Create independent reactive scope
-const dispose = createRoot((dispose) => {
-  const [count, setCount] = createSignal(0);
-
-  createEffect(() => {
-    console.log("Count:", count());
-  });
-
-  setCount(1); // Logs: "Count: 1"
-  setCount(2); // Logs: "Count: 2"
-
-  // Return cleanup function
-  return () => {
-    console.log("Cleaning up root");
-    dispose();
-  };
-});
-
-// Later: manually dispose
-dispose();
-
-// Global state management
-interface Store {
-  user: () => any;
-  setUser: (user: any) => void;
-}
-
-const store = createRoot<Store>(() => {
-  const [user, setUser] = createSignal<any>(null);
-
-  return { user, setUser };
-});
-
-// Use anywhere
-store.setUser({ name: "John", id: "123" });
-console.log(store.user()); // { name: "John", id: "123" }
-
-// Event bus with reactive state
-const eventBus = createRoot(() => {
-  const [events, setEvents] = createSignal<Array<{ type: string; data: any }>>([]);
-
-  const emit = (type: string, data: any) => {
-    setEvents(prev => [...prev, { type, data }]);
-  };
-
-  const subscribe = (type: string, callback: (data: any) => void) => {
-    createEffect(() => {
-      events()
-        .filter(e => e.type === type)
-        .forEach(e => callback(e.data));
-    });
-  };
-
-  return { emit, subscribe };
-});
-
-eventBus.subscribe("user-login", (data) => {
-  console.log("User logged in:", data);
-});
-
-eventBus.emit("user-login", { name: "Jane" });
-```
-
-### batch - Batch multiple updates
-
-Defers reactive updates until the batch completes. Prevents multiple re-renders when updating multiple signals at once.
-
-```typescript
-import { batch, createSignal, createEffect } from "solid-js";
-
-const [firstName, setFirstName] = createSignal("John");
-const [lastName, setLastName] = createSignal("Doe");
-
-let effectRunCount = 0;
-
-createEffect(() => {
-  effectRunCount++;
-  console.log(`Effect run #${effectRunCount}: ${firstName()} ${lastName()}`);
-});
-
-// Without batch - effect runs twice
-setFirstName("Jane");
-setLastName("Smith");
-// Logs:
-// "Effect run #2: Jane Doe"
-// "Effect run #3: Jane Smith"
-
-// With batch - effect runs once
-batch(() => {
-  setFirstName("Alice");
-  setLastName("Johnson");
-});
-// Logs:
-// "Effect run #4: Alice Johnson"
-
-// Complex state updates
-function updateUserProfile(updates: { name?: string; email?: string; age?: number }) {
-  batch(() => {
-    if (updates.name) setName(updates.name);
-    if (updates.email) setEmail(updates.email);
-    if (updates.age) setAge(updates.age);
-  });
-}
-
-const [name, setName] = createSignal("");
-const [email, setEmail] = createSignal("");
-const [age, setAge] = createSignal(0);
-
-updateUserProfile({ name: "John", email: "john@example.com", age: 30 });
-```
-
-### untrack - Disable dependency tracking
-
-Reads signals without creating dependencies. Useful for conditional logic that shouldn't trigger re-runs.
-
-```typescript
-import { createSignal, createEffect, untrack } from "solid-js";
-
-const [count, setCount] = createSignal(0);
-const [enabled, setEnabled] = createSignal(true);
-
-// Effect only tracks 'enabled', not 'count'
-createEffect(() => {
-  if (enabled()) {
-    console.log("Count is:", untrack(count));
-  }
-});
-
-setCount(5); // Does NOT trigger effect
-setEnabled(false); // Triggers effect
-
-// Conditional tracking
-const [source, setSource] = createSignal("A");
-const [valueA, setValueA] = createSignal(1);
-const [valueB, setValueB] = createSignal(2);
-
-createEffect(() => {
-  const src = source();
-  const value = src === "A" ? valueA() : untrack(valueB);
-  console.log(`Using ${src}: ${value}`);
-});
-
-setValueA(10); // Triggers effect
-setValueB(20); // Does NOT trigger effect (untracked)
-setSource("B"); // Triggers effect, now reads valueB
-
-// Break infinite loops
-const [data, setData] = createSignal({ x: 0, y: 0 });
-
-createEffect(() => {
-  const current = data();
-  // Use untrack to avoid reading data() again
-  const magnitude = Math.sqrt(
-    untrack(() => current.x ** 2 + current.y ** 2)
-  );
-
-  console.log("Magnitude:", magnitude);
-});
-```
-
-### on - Explicit dependency tracking
-
-Makes dependencies explicit and controls when effects run. Supports deferred execution to skip the first run.
-
-```typescript
-import { createSignal, createEffect, on } from "solid-js";
-
-const [a, setA] = createSignal(0);
-const [b, setB] = createSignal(0);
-
-// Only track 'a', but can read 'b' without tracking
-createEffect(
-  on(a, () => {
-    console.log(`a = ${a()}, b = ${b()}`);
-  })
-);
-
-setA(1); // Triggers effect: "a = 1, b = 0"
-setB(5); // Does NOT trigger effect
-setA(2); // Triggers effect: "a = 2, b = 5"
-
-// Multiple dependencies
-createEffect(
-  on([a, b], ([aVal, bVal]) => {
-    console.log(`Values: ${aVal}, ${bVal}`);
-  })
-);
-
-// Deferred execution - skip first run
-const [count, setCount] = createSignal(0);
-
-createEffect(
-  on(
-    count,
-    () => {
-      console.log("Count changed to:", count());
+export default defineConfig({
+  server: {
+    preset: "cloudflare_module",
+    rollupConfig: {
+      external: ["__STATIC_CONTENT_MANIFEST", "node:async_hooks"],
     },
-    { defer: true }
-  )
-);
-
-// Effect doesn't run immediately
-setCount(1); // Logs: "Count changed to: 1"
-
-// Track previous value
-createEffect(
-  on(count, (value, prevValue) => {
-    console.log(`Changed from ${prevValue} to ${value}`);
-  })
-);
+  },
+});
 ```
 
-### catchError - Handle errors in reactive scope
+--------------------------------
 
-Catches errors thrown in reactive computations and provides a handler. Prevents errors from propagating up the tree.
+### POST /createHandler
+
+Source: https://docs.solidjs.com/solid-start/reference/server/create-handler
+
+The createHandler function is used to start the server in entry-server.tsx. It takes a function that returns a static document and serves it using one of the three functions for server-side rendering (SSR): renderToString, renderToStringAsync, or renderToStream. The SSR mode can be configured through the 'mode' property on the options object.
+
+```APIDOC
+## POST /createHandler
+
+### Description
+Initializes the Solid Start server handler with a function that generates the static document and configures the server-side rendering (SSR) mode.
+
+### Method
+POST
+
+### Endpoint
+/createHandler
+
+### Parameters
+#### Arguments
+- **fn** (function) - Required - A function that returns the static document for your application. It receives a `context` of type `PageEvent`.
+- **options.mode** (string) - Optional - The SSR mode. Options are 'sync', 'async', and 'stream'. Defaults to 'stream'.
+
+### Request Example
+```typescript
+import { createHandler, StartServer } from "@solidjs/start/server";
+
+export default createHandler(() => (
+  <StartServer document={...} />
+), {
+  mode: "async"
+});
+```
+
+### Response
+#### Success Response (200)
+- **handler** (function) - The configured server handler.
+
+#### Response Example
+```json
+{
+  "message": "Handler created successfully."
+}
+```
+```
+
+--------------------------------
+
+### Set 404 Status for Unmatched Routes (SolidStart)
+
+Source: https://docs.solidjs.com/solid-start/reference/server/http-status-code
+
+This example demonstrates how to set a 404 status code for unmatched routes using the HttpStatusCode component within a SolidStart application. It's integrated into a 'NotFound' component, ensuring that when this page is rendered, the browser receives a 404 response. This is crucial for SEO and caching.
+
+```jsx
+import { HttpStatusCode } from "@solidjs/start";
+
+
+export default function NotFound() {
+  return (
+    <div>
+      <HttpStatusCode code={404} />
+      <h1>Page not found</h1>
+    </div>
+  );
+}
+```
+
+--------------------------------
+
+### Protected Route with Redirect (JavaScript)
+
+Source: https://docs.solidjs.com/solid-start/advanced/auth
+
+This example demonstrates protecting a route using a server function that redirects unauthenticated users. The `getPrivatePosts` function, when called, checks for user authentication and throws a redirect to '/login' if the user is not found. The Page component then uses `createAsync` to fetch the data, triggering the redirect if necessary.
+
+```javascript
+const getPrivatePosts = query(async function() {
+  "use server"
+  const user = await getUser()
+  if(!user) {
+    throw redirect("/login");
+  }
+
+
+  return db.getPosts({ userId: user.id, private: true })
+})
+
+
+export default function Page() {
+  const posts = createAsync(() => getPrivatePosts());
+}
+```
+
+--------------------------------
+
+### Return Custom Response from Middleware (SolidStart)
+
+Source: https://docs.solidjs.com/solid-start/advanced/middleware
+
+This middleware example shows how returning a `Response` object from an `onRequest` handler immediately terminates the request processing pipeline and sends the `Response` as the result. This is useful for handling unauthorized access or other early exits. Requires `@solidjs/start/middleware`.
 
 ```typescript
-import { catchError, createSignal, createEffect } from "solid-js";
+import { createMiddleware } from "@solidjs/start/middleware";
 
-const [shouldThrow, setShouldThrow] = createSignal(false);
 
-catchError(
-  () => {
-    createEffect(() => {
-      if (shouldThrow()) {
-        throw new Error("Something went wrong!");
-      }
-      console.log("Everything is fine");
-    });
+export default createMiddleware({
+  onRequest: () => {
+    return new Response("Unauthorized", { status: 401 });
   },
-  (error) => {
-    console.error("Caught error:", error.message);
-  }
-);
+});
+```
 
-setShouldThrow(true); // Logs: "Caught error: Something went wrong!"
+--------------------------------
 
-// Nested error handlers
-catchError(
-  () => {
-    console.log("Outer scope");
+### Handle Data Fetching Errors in SolidStart (TypeScript/JavaScript)
 
-    catchError(
-      () => {
-        throw new Error("Inner error");
-      },
-      (err) => {
-        console.error("Inner handler:", err.message);
-        // Optionally re-throw to propagate
-        // throw err;
-      }
+Source: https://docs.solidjs.com/solid-start/guides/data-fetching
+
+Illustrates how to gracefully handle errors during data fetching in SolidStart using `ErrorBoundary`. The `ErrorBoundary` component wraps the data rendering, providing a fallback UI when an error occurs. Dependencies include `solid-js` and `@solidjs/router`.
+
+```typescript
+// src/routes/index.tsx
+import { ErrorBoundary, Suspense, For } from "solid-js";
+import { query, createAsync } from "@solidjs/router";
+
+
+const getPosts = query(async () => {
+  const posts = await fetch("https://my-api.com/posts");
+  return await posts.json();
+}, "posts");
+
+
+export default function Page() {
+  const posts = createAsync(() => getPosts());
+  return (
+    <ul>
+      <ErrorBoundary fallback={<div>Something went wrong!</div>}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <For each={posts()}>{(post) => <li>{post.title}</li>}</For>
+        </Suspense>
+      </ErrorBoundary>
+    </ul>
+  );
+}
+
+```
+
+```javascript
+// src/routes/index.jsx
+import { ErrorBoundary, Suspense, For } from "solid-js";
+import { query, createAsync } from "@solidjs/router";
+
+
+const getPosts = query(async () => {
+  const posts = await fetch("https://my-api.com/posts");
+  return await posts.json();
+}, "posts");
+
+
+export default function Page() {
+  const posts = createAsync(() => getPosts());
+  return (
+    <ul>
+      <ErrorBoundary fallback={<div>Something went wrong!</div>}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <For each={posts()}>{(post) => <li>{post.title}</li>}</For>
+        </Suspense>
+      </ErrorBoundary>
+    </ul>
+  );
+}
+
+```
+
+--------------------------------
+
+### Trigger Action Programmatically with SolidStart (JavaScript)
+
+Source: https://docs.solidjs.com/solid-start/guides/data-mutation
+
+This snippet shows how to programmatically trigger an action in a SolidStart application using plain JavaScript. It mirrors the TypeScript example by importing `useAction` from `@solidjs/router`, defining an `action`, and invoking it via a button. It requires `solid-js` and `@solidjs/router`.
+
+```javascript
+// src/routes/index.jsx
+import { createSignal } from "solid-js";
+import { action, useAction } from "@solidjs/router";
+
+
+const addPost = action(async (title) => {
+  await fetch("https://my-api.com/posts", {
+    method: "POST",
+    body: JSON.stringify({ title }),
+  });
+}, "addPost");
+
+
+export default function Page() {
+  const [title, setTitle] = createSignal("");
+  const addPostAction = useAction(addPost);
+  return (
+    <div>
+      <input value={title()} onInput={(e) => setTitle(e.target.value)} />
+      <button onClick={() => addPostAction(title())}>Add Post</button>
+    </div>
+  );
+}
+
+```
+
+--------------------------------
+
+### Organize Routes with Route Groups in SolidStart
+
+Source: https://docs.solidjs.com/solid-start/building-your-application/routing
+
+Route groups, denoted by parentheses `()` around folder names within the `routes` directory, allow for logical organization of routes without affecting the URL structure. This helps manage complex routing setups.
+
+```directory structure
+|-- routes/
+    |-- (static)
+        |-- about-us                // example.com/about-us
+            |-- index.tsx
+        |-- contact-us              // example.com/contact-us
+            |-- index.tsx
+```
+
+--------------------------------
+
+### Get Stable Server Function ID with getServerFunctionMeta (SolidStart)
+
+Source: https://docs.solidjs.com/solid-start/reference/server/get-server-function-meta
+
+getServerFunctionMeta returns a stable ID for server functions, ensuring consistent identification even when run in parallel across multiple cores or workers. The ID is guaranteed to be stable for the duration of a function's execution but may change between builds. This function is crucial for managing shared state or caching mechanisms tied to specific server function instances.
+
+```typescript
+import { getServerFunctionMeta } from "@solidjs/start";
+
+
+// or some in-memory db
+const appCache: any = globalThis;
+
+
+const counter = async () => {
+  "use server";
+  const { id } = getServerFunctionMeta()!;
+  const key = `counter_${id}`;
+  appCache[key] = appCache[key] ?? 0;
+  appCache[key]++;
+
+
+  return appCache[key] as number;
+};
+```
+
+--------------------------------
+
+### Configure SolidStart Middleware
+
+Source: https://docs.solidjs.com/solid-start/reference/server/create-middleware
+
+Demonstrates how to use `createMiddleware` to define middleware functions for SolidStart. It shows how to specify functions for both `onRequest` and `onBeforeResponse` events. This configuration is then referenced in `app.config.ts`.
+
+```typescript
+import {
+  createMiddleware,
+} from "@solidjs/start/middleware";
+
+export default createMiddleware({
+  onRequest: (event) => {
+    console.log("Request received:", event.request.url);
+  },
+  onBeforeResponse: (event) => {
+    console.log("Sending response:", event.response.status);
+  },
+});
+
+```
+
+```typescript
+import {
+  defineConfig,
+} from "@solidjs/start/config";
+
+export default defineConfig({
+  middleware: "src/middleware/index.ts",
+});
+
+```
+
+--------------------------------
+
+### Configure SolidStart Middleware
+
+Source: https://docs.solidjs.com/solid-start/advanced/middleware
+
+This snippet shows how to configure middleware in SolidStart by exporting a configuration object from `src/middleware/index.ts`. It uses `createMiddleware` to define `onRequest` and `onBeforeResponse` handlers. The `onRequest` handler logs the request URL and sets a `startTime` in `event.locals`. The `onBeforeResponse` handler calculates and logs the request duration. Dependencies include `@solidjs/start/middleware`.
+
+```typescript
+import { createMiddleware } from "@solidjs/start/middleware";
+
+
+export default createMiddleware({
+  onRequest: (event) => {
+    console.log("Request received:", event.request.url);
+
+
+    event.locals.startTime = Date.now();
+  },
+  onBeforeResponse: (event) => {
+    const endTime = Date.now();
+    const duration = endTime - event.locals.startTime;
+    console.log(`Request took ${duration}ms`);
+  },
+});
+```
+
+--------------------------------
+
+### Configure Server Entrypoint with SolidStart
+
+Source: https://docs.solidjs.com/solid-start/reference/entrypoints/entry-server
+
+This code snippet demonstrates the basic structure of `entry-server.tsx` in SolidStart. It initializes the server handler using `createHandler` and `StartServer`, configuring the HTML document structure for server-side rendering. Dependencies include `@solidjs/start/server`. The output is a fully rendered HTML document for the initial server request.
+
+```typescript
+import { createHandler, StartServer } from "@solidjs/start/server";
+
+
+export default createHandler(() => (
+  <StartServer
+    document={({ assets, children, scripts }) => (
+      <html lang="en">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <link rel="icon" href="/favicon.ico" />
+          {assets}
+        </head>
+        <body>
+          <div id="app">{children}</div>
+          {scripts}
+        </body>
+      </html>
+    )}
+  />
+));
+```
+
+--------------------------------
+
+### StartServer Function
+
+Source: https://docs.solidjs.com/solid-start/reference/server/start-server
+
+The StartServer function is used to convert a document component function into a static document suitable for server bootstrapping.
+
+```APIDOC
+## StartServer
+
+### Description
+`StartServer` takes a function returning a document component and converts it to a static document which can be used in `createHandler` to bootstrap the server.
+
+### Method
+N/A (This is a function/utility, not an HTTP endpoint)
+
+### Endpoint
+N/A
+
+### Parameters
+#### Path Parameters
+None
+
+#### Query Parameters
+None
+
+#### Request Body
+None
+
+### Parameters
+#### Function Signature
+```typescript
+StartServer(document: () => JSX.Element): StaticDocument;
+```
+
+#### Parameters
+- **document** (Function) - Required - A function that returns the static document for your application.
+
+### Request Example
+```javascript
+import { StartServer } from "@solidjs/start/server";
+
+const handler = createHandler({
+  // ... other options
+  routes: web.routes(),
+  render: StartServer(function Document({ url, ...props }) {
+    const sheet = new Sheet();
+    return (
+      <Html lang="en">
+        <Head>
+          <Meta charset="utf-8" />
+          <link rel="manifest" href="/manifest.json" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+          <style data-emotion="css-random" dangerouslySetInnerHTML={{ __html: sheet.getStyleTags() }} />
+        </Head>
+        <Body>
+          <A a={props.a} />
+          <Suspense>{props.children}</Suspense>
+        </Body>
+      </Html>
     );
+  }),
+});
+```
+
+### Response
+#### Success Response (N/A)
+This function returns a `StaticDocument` object used internally by SolidStart.
+
+#### Response Example
+N/A
+```
+
+--------------------------------
+
+### Initialize Server with StartServer in SolidStart
+
+Source: https://docs.solidjs.com/solid-start/reference/server/start-server
+
+The StartServer function from '@solidjs/start/server' is used to convert a document component function into a static document. This static document is then utilized within 'createHandler' to bootstrap the server-side rendering process for a SolidStart application.
+
+```typescript
+import { StartServer } from "@solidjs/start/server";
+```
+
+--------------------------------
+
+### SolidStart FileRoutes with Solid-Router
+
+Source: https://docs.solidjs.com/solid-start/reference/routing/file-routes
+
+Demonstrates how to use the FileRoutes component with solid-router to define routes based on file structure. It requires importing Suspense, Router from '@solidjs/router', and FileRoutes from '@solidjs/start/router'. The output is a configured router instance with dynamically generated routes.
+
+```javascript
+import {
+  Suspense
+} from "solid-js";
+import {
+  Router
+} from "@solidjs/router";
+import {
+  FileRoutes
+} from "@solidjs/start/router";
+
+
+export default function App() {
+  return (
+    <Router root={(props) => <Suspense>{props.children}</Suspense>}>
+      <FileRoutes />
+    </Router>
+  );
+}
+```
+
+--------------------------------
+
+### Handle Cookies using Vinxi Helpers in Middleware (SolidStart)
+
+Source: https://docs.solidjs.com/solid-start/advanced/middleware
+
+This middleware snippet shows how to read and set cookies using `getCookie` and `setCookie` helpers from Vinxi. It demonstrates reading a 'theme' cookie and setting a secure 'session' cookie with expiration options. Requires `@solidjs/start/middleware` and `vinxi/http`.
+
+```typescript
+import { createMiddleware } from "@solidjs/start/middleware";
+import { getCookie, setCookie } from "vinxi/http";
+
+
+export default createMiddleware({
+  onRequest: (event) => {
+    // Reading a cookie
+    const theme = getCookie(event.nativeEvent, "theme");
+
+
+    // Setting a secure session cookie with expiration
+    setCookie(event.nativeEvent, "session", "abc123", {
+      httpOnly: true,
+      secure: true,
+      maxAge: 60 * 60 * 24, // 1 day
+    });
   },
-  (err) => {
-    console.error("Outer handler:", err.message);
-  }
-);
+});
+```
 
-// Error recovery
-function DataComponent() {
-  const [data, setData] = createSignal<any>(null);
-  const [error, setError] = createSignal<Error | null>(null);
+--------------------------------
 
-  catchError(
-    () => {
-      createEffect(async () => {
-        try {
-          const result = await fetchData();
-          setData(result);
-        } catch (err) {
-          throw err;
-        }
-      });
-    },
-    (err) => {
-      setError(err as Error);
+### Implementing Redirects with Solid Router
+
+Source: https://docs.solidjs.com/solid-start/advanced/middleware
+
+Use the `redirect` helper function from Solid Router within middleware to create and return redirect responses.
+
+```APIDOC
+## Implementing Redirects with Solid Router
+
+### Description
+Create and return HTTP redirect responses using the `redirect` helper function from `@solidjs/router` within SolidStart middleware.
+
+### Method
+`createMiddleware`
+
+### Endpoint
+N/A (Applies globally to requests)
+
+### Parameters
+#### Request Body
+N/A
+
+### Request Example
+```javascript
+import { createMiddleware } from "@solidjs/start/middleware";
+import { redirect } from "@solidjs/router";
+
+const REDIRECT_MAP: Record<string, string> = {
+  "/signup": "/auth/signup",
+  "/login": "/auth/login",
+};
+
+export default createMiddleware({
+  onRequest: (event) => {
+    const { pathname } = new URL(event.request.url);
+
+    // Redirecting legacy routes permanently to new paths
+    if (pathname in REDIRECT_MAP) {
+      return redirect(REDIRECT_MAP[pathname], 301);
     }
-  );
-
-  return (
-    <Show when={!error()} fallback={<div>Error: {error()!.message}</div>}>
-      <div>Data: {JSON.stringify(data())}</div>
-    </Show>
-  );
-}
-
-async function fetchData() {
-  throw new Error("API error");
-}
+  },
+});
 ```
 
-## DOM Manipulation
+### Response
+#### Success Response (200)
+A redirect `Response` (e.g., 301, 302) is sent to the client.
 
-### Portal - Render outside component hierarchy
+#### Response Example
+```
+HTTP/1.1 301 Moved Permanently
+Location: /auth/signup
 
-Renders children into a different part of the DOM tree. Useful for modals, tooltips, and overlays that need to break out of overflow or z-index contexts.
+```
+```
+
+--------------------------------
+
+### Expose GraphQL API using graphql library
+
+Source: https://docs.solidjs.com/solid-start/building-your-application/api-routes
+
+Implement a GraphQL API by defining a schema and resolvers. The `graphql` function from the 'graphql' library is used to create an API route handler. It requires the 'graphql' library and handles requests to query the defined schema.
+
+```javascript
+import { buildSchema, graphql } from "graphql";
+import type { APIEvent } from "@solidjs/start/server";
+
+
+// Define GraphQL Schema
+const schema = buildSchema(`
+  type Message {
+      message: String
+  }
+
+
+  type Query {
+    hello(input: String): Message
+    goodbye: String
+  }
+`);
+
+
+// Define GraphQL Resolvers
+const rootValue = {
+  hello: () => {
+    return {
+      message: "Hello World"
+    };
+  },
+  goodbye: () => {
+    return "Goodbye";
+  }
+};
+
+
+// request handler
+const handler = async (event: APIEvent) => {
+  // get request body
+  const body = await new Response(event.request.body).json();
+
+
+  // pass query and save results
+  const result = await graphql({ rootValue, schema, source: body.query });
+
+
+  // send query result
+  return result;
+};
+
+
+export const GET = handler;
+
+
+export const POST = handler;
+```
+
+--------------------------------
+
+### Cookie Management with Vinxi Helpers
+
+Source: https://docs.solidjs.com/solid-start/advanced/middleware
+
+Simplify cookie handling in SolidStart middleware using the `getCookie` and `setCookie` helpers provided by Vinxi.
+
+```APIDOC
+## Cookie Management with Vinxi Helpers
+
+### Description
+Manage HTTP cookies easily within SolidStart middleware using Vinxi's `getCookie` and `setCookie` helper functions.
+
+### Method
+`createMiddleware`
+
+### Endpoint
+N/A (Applies globally to requests)
+
+### Parameters
+#### Request Body
+N/A
+
+### Request Example
+```javascript
+import { createMiddleware } from "@solidjs/start/middleware";
+import { getCookie, setCookie } from "vinxi/http";
+
+export default createMiddleware({
+  onRequest: (event) => {
+    // Reading a cookie
+    const theme = getCookie(event.nativeEvent, "theme");
+
+    // Setting a secure session cookie with expiration
+    setCookie(event.nativeEvent, "session", "abc123", {
+      httpOnly: true,
+      secure: true,
+      maxAge: 60 * 60 * 24, // 1 day
+    });
+  },
+});
+```
+
+### Response
+#### Success Response (200)
+Cookies can be read from incoming requests and set in outgoing responses.
+
+#### Response Example
+N/A
+```
+
+--------------------------------
+
+### Configure SolidStart App with defineConfig
+
+Source: https://docs.solidjs.com/solid-start/reference/entrypoints/app-config
+
+This snippet demonstrates the basic usage of the defineConfig helper from '@solidjs/start/config' to set up the root configuration for a SolidStart application. It utilizes default settings, making it a minimal yet functional configuration.
 
 ```typescript
-import { Portal, createSignal } from "solid-js";
-import { render } from "solid-js/web";
+import { defineConfig } from "@solidjs/start/config";
 
-function App() {
-  const [showModal, setShowModal] = createSignal(false);
 
-  return (
-    <div style={{ overflow: "hidden", height: "100px" }}>
-      <button onClick={() => setShowModal(true)}>Open Modal</button>
+export default defineConfig({});
 
-      <Show when={showModal()}>
-        <Portal>
-          <div class="modal-overlay" onClick={() => setShowModal(false)}>
-            <div class="modal-content" onClick={(e) => e.stopPropagation()}>
-              <h2>Modal Title</h2>
-              <p>This is rendered in document.body</p>
-              <button onClick={() => setShowModal(false)}>Close</button>
-            </div>
-          </div>
-        </Portal>
-      </Show>
-    </div>
-  );
-}
-
-// Portal to specific element
-function CustomPortal() {
-  return (
-    <Portal mount={document.getElementById("portal-root")!}>
-      <div>Rendered in #portal-root</div>
-    </Portal>
-  );
-}
-
-// Portal with shadow DOM
-function IsolatedWidget() {
-  return (
-    <Portal useShadow>
-      <div>
-        <style>{`
-          .widget { background: blue; color: white; padding: 20px; }
-        `}</style>
-        <div class="widget">Isolated styles</div>
-      </div>
-    </Portal>
-  );
-}
-
-// SVG Portal
-function SvgOverlay() {
-  return (
-    <Portal mount={document.getElementById("svg-container")} isSVG>
-      <circle cx="50" cy="50" r="40" fill="red" />
-    </Portal>
-  );
-}
-
-render(() => <App />, document.getElementById("app")!);
 ```
-
-### Dynamic - Render dynamic components
-
-Renders a component or element dynamically based on a variable. The component type can change reactively.
-
-```typescript
-import { Dynamic, createSignal } from "solid-js";
-
-function Button(props: any) {
-  return <button {...props}>{props.children}</button>;
-}
-
-function Link(props: any) {
-  return <a {...props}>{props.children}</a>;
-}
-
-function DynamicExample() {
-  const [component, setComponent] = createSignal<"button" | "a">("button");
-
-  return (
-    <div>
-      <Dynamic
-        component={component() === "button" ? "button" : "a"}
-        href={component() === "a" ? "#" : undefined}
-        onClick={() => console.log("Clicked")}
-      >
-        Click me
-      </Dynamic>
-
-      <button onClick={() => setComponent(component() === "button" ? "a" : "button")}>
-        Toggle Component
-      </button>
-    </div>
-  );
-}
-
-// Dynamic component from registry
-function ComponentRegistry() {
-  const components = {
-    button: Button,
-    link: Link,
-    text: (props: any) => <span {...props}>{props.children}</span>
-  };
-
-  const [selectedType, setSelectedType] = createSignal<keyof typeof components>("button");
-
-  return (
-    <div>
-      <Dynamic
-        component={components[selectedType()]}
-        onClick={() => console.log("Clicked")}
-      >
-        Dynamic Content
-      </Dynamic>
-
-      <select onChange={(e) => setSelectedType(e.currentTarget.value as any)}>
-        <option value="button">Button</option>
-        <option value="link">Link</option>
-        <option value="text">Text</option>
-      </select>
-    </div>
-  );
-}
-
-// Dynamic with type safety
-type ComponentType = typeof Button | typeof Link | "div";
-
-function TypeSafeDynamic() {
-  const [comp, setComp] = createSignal<ComponentType>("div");
-
-  return (
-    <Dynamic component={comp()} class="dynamic-element">
-      Content
-    </Dynamic>
-  );
-}
-```
-
-## Summary
-
-SolidJS excels at building reactive user interfaces with minimal overhead and maximum control. The library's fine-grained reactivity system ensures that only the specific DOM nodes affected by state changes are updated, without virtual DOM diffing or unnecessary re-renders. Core use cases include building single-page applications, dashboards with real-time data, complex forms with validation, server-side rendered websites with progressive enhancement, and component libraries. The createSignal, createMemo, and createEffect primitives form the reactive foundation, while createStore handles complex nested state. Control flow components like For, Show, and Switch provide declarative conditional rendering and list management.
-
-Integration patterns leverage the library's flexibility through Context API for dependency injection, Resources for async data fetching with Suspense, lazy loading for code splitting, and Portal for rendering outside the component tree. SolidJS works seamlessly with TypeScript, provides first-class SSR support through solid-start, and integrates with existing tools like Vite and Rollup. The reactive primitives can be used independently of the rendering layer, enabling reactive state management in any JavaScript environment. With its small bundle size, no runtime compilation, and performance matching vanilla JavaScript, SolidJS delivers a powerful developer experience for building fast, maintainable applications.

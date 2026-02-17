@@ -1,1321 +1,991 @@
-# Material React Table V3
+# TanStack Query
 
-Material React Table is a fully-featured React data table component library built on top of Material UI V6 and TanStack Table V8. It provides a TypeScript-first approach to creating professional, responsive data tables with Material Design styling and comprehensive built-in functionality. The library combines the headless table logic of TanStack Table with the polished component system of Material UI to deliver production-ready tables with minimal configuration.
+TanStack Query (formerly React Query) is an async state management library that simplifies fetching, caching, synchronizing, and updating server state in web applications. It is protocol-agnostic, working seamlessly with REST, GraphQL, or any Promise-based data fetching mechanism. The library provides powerful features including automatic caching, background refetching, pagination, infinite scroll, mutations with optimistic updates, prefetching, request cancellation, and React Suspense support.
 
-The library supports 50+ features including sorting, filtering, pagination, column ordering, row selection, editing, aggregation, virtualization, and more. All features can be easily enabled or disabled through a declarative API. With built-in support for 38+ languages, extensive customization options, and a small bundle size (30-56KB gzipped), Material React Table offers both developer experience and end-user performance. It ships with TypeScript definitions, comprehensive documentation, and works seamlessly with server-side data fetching patterns.
-
----
-
-## Basic Table Setup
-
-Create a simple data table with default features enabled.
-
-```tsx
-import { useMemo } from 'react';
-import {
-  MaterialReactTable,
-  useMaterialReactTable,
-  type MRT_ColumnDef,
-} from 'material-react-table';
-
-type Person = {
-  name: {
-    firstName: string;
-    lastName: string;
-  };
-  address: string;
-  city: string;
-  state: string;
-};
-
-const data: Person[] = [
-  {
-    name: { firstName: 'John', lastName: 'Doe' },
-    address: '261 Erdman Ford',
-    city: 'East Daphne',
-    state: 'Kentucky',
-  },
-  {
-    name: { firstName: 'Jane', lastName: 'Doe' },
-    address: '769 Dominic Grove',
-    city: 'Columbus',
-    state: 'Ohio',
-  },
-];
-
-export default function Example() {
-  const columns = useMemo<MRT_ColumnDef<Person>[]>(
-    () => [
-      {
-        accessorKey: 'name.firstName', // Access nested data with dot notation
-        header: 'First Name',
-        size: 150,
-      },
-      {
-        accessorKey: 'name.lastName',
-        header: 'Last Name',
-        size: 150,
-      },
-      {
-        accessorKey: 'address',
-        header: 'Address',
-        size: 200,
-      },
-      {
-        accessorKey: 'city',
-        header: 'City',
-        size: 150,
-      },
-      {
-        accessorKey: 'state',
-        header: 'State',
-        size: 150,
-      },
-    ],
-    [],
-  );
-
-  const table = useMaterialReactTable({
-    columns,
-    data, // Data must be memoized or stable
-  });
-
-  return <MaterialReactTable table={table} />;
-}
-```
+TanStack Query offers official adapters for multiple frameworks: React (`@tanstack/react-query`), Vue (`@tanstack/vue-query`), Solid (`@tanstack/solid-query`), Svelte (`@tanstack/svelte-query`), and Angular (`@tanstack/angular-query-experimental`). All adapters share the same core concepts and API patterns, making it easy to work across different frontend frameworks while maintaining consistent server state management patterns.
 
 ---
 
-## Table Hook with State Management
+## QueryClient Setup
 
-Use the hook to create a table instance with custom state management and feature toggles.
-
-```tsx
-import { useMemo, useState, useEffect } from 'react';
-import {
-  MaterialReactTable,
-  useMaterialReactTable,
-  type MRT_ColumnDef,
-} from 'material-react-table';
-
-type Person = {
-  name: string;
-  age: number;
-};
-
-const data: Person[] = [
-  { name: 'John', age: 30 },
-  { name: 'Sara', age: 25 },
-];
-
-export default function App() {
-  const columns = useMemo<MRT_ColumnDef<Person>[]>(
-    () => [
-      {
-        accessorKey: 'name',
-        header: 'Name',
-        muiTableHeadCellProps: { sx: { color: 'green' } },
-        Cell: ({ cell }) => <span>{cell.getValue()}</span>,
-      },
-      {
-        accessorFn: (row) => row.age, // Alternate accessor method
-        id: 'age', // ID required when using accessorFn
-        header: 'Age',
-        Header: () => <i>Age</i>, // Custom header component
-      },
-    ],
-    [],
-  );
-
-  // Manage table state externally
-  const [rowSelection, setRowSelection] = useState({});
-  const [sorting, setSorting] = useState([]);
-
-  useEffect(() => {
-    console.log('Row selection changed:', rowSelection);
-  }, [rowSelection]);
-
-  const table = useMaterialReactTable({
-    columns,
-    data,
-    enableColumnOrdering: true,
-    enableRowSelection: true,
-    enablePagination: false,
-    onRowSelectionChange: setRowSelection,
-    onSortingChange: setSorting,
-    state: { rowSelection, sorting }, // Pass state back to table
-  });
-
-  const handleEvent = () => {
-    // Access table state from instance
-    console.log(table.getState().sorting);
-    console.log(table.getState().rowSelection);
-  };
-
-  return (
-    <div>
-      <button onClick={handleEvent}>Log Table State</button>
-      <MaterialReactTable table={table} />
-    </div>
-  );
-}
-```
-
----
-
-## CRUD Operations with Row Editing
-
-Implement full Create, Read, Update, Delete operations with inline row editing and validation.
+The QueryClient is the central manager for all query and mutation caching. It must be created and provided to your application before using any TanStack Query hooks.
 
 ```tsx
-import { useMemo, useState } from 'react';
-import {
-  MaterialReactTable,
-  type MRT_ColumnDef,
-  type MRT_Row,
-  type MRT_TableOptions,
-  useMaterialReactTable,
-} from 'material-react-table';
-import { Box, Button, IconButton, Tooltip } from '@mui/material';
 import {
   QueryClient,
   QueryClientProvider,
-  useMutation,
   useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
+} from '@tanstack/react-query'
 
-type User = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  state: string;
-};
-
-const usStates = ['California', 'Texas', 'Florida', 'New York'];
-
-function Example() {
-  const [validationErrors, setValidationErrors] = useState<
-    Record<string, string | undefined>
-  >({});
-
-  const columns = useMemo<MRT_ColumnDef<User>[]>(
-    () => [
-      {
-        accessorKey: 'id',
-        header: 'Id',
-        enableEditing: false,
-        size: 80,
-      },
-      {
-        accessorKey: 'firstName',
-        header: 'First Name',
-        muiEditTextFieldProps: {
-          required: true,
-          error: !!validationErrors?.firstName,
-          helperText: validationErrors?.firstName,
-          onFocus: () =>
-            setValidationErrors({
-              ...validationErrors,
-              firstName: undefined,
-            }),
-        },
-      },
-      {
-        accessorKey: 'lastName',
-        header: 'Last Name',
-        muiEditTextFieldProps: {
-          required: true,
-          error: !!validationErrors?.lastName,
-          helperText: validationErrors?.lastName,
-          onFocus: () =>
-            setValidationErrors({
-              ...validationErrors,
-              lastName: undefined,
-            }),
-        },
-      },
-      {
-        accessorKey: 'email',
-        header: 'Email',
-        muiEditTextFieldProps: {
-          type: 'email',
-          required: true,
-          error: !!validationErrors?.email,
-          helperText: validationErrors?.email,
-          onFocus: () =>
-            setValidationErrors({
-              ...validationErrors,
-              email: undefined,
-            }),
-        },
-      },
-      {
-        accessorKey: 'state',
-        header: 'State',
-        editVariant: 'select',
-        editSelectOptions: usStates,
-        muiEditTextFieldProps: {
-          select: true,
-          error: !!validationErrors?.state,
-          helperText: validationErrors?.state,
-        },
-      },
-    ],
-    [validationErrors],
-  );
-
-  // React Query hooks for CRUD operations
-  const { mutateAsync: createUser, isPending: isCreatingUser } =
-    useCreateUser();
-  const {
-    data: fetchedUsers = [],
-    isError: isLoadingUsersError,
-    isFetching: isFetchingUsers,
-    isLoading: isLoadingUsers,
-  } = useGetUsers();
-  const { mutateAsync: updateUser, isPending: isUpdatingUser } =
-    useUpdateUser();
-  const { mutateAsync: deleteUser, isPending: isDeletingUser } =
-    useDeleteUser();
-
-  // CREATE action
-  const handleCreateUser: MRT_TableOptions<User>['onCreatingRowSave'] = async ({
-    values,
-    table,
-  }) => {
-    const newValidationErrors = validateUser(values);
-    if (Object.values(newValidationErrors).some((error) => error)) {
-      setValidationErrors(newValidationErrors);
-      return;
-    }
-    setValidationErrors({});
-    await createUser(values);
-    table.setCreatingRow(null);
-  };
-
-  // UPDATE action
-  const handleSaveUser: MRT_TableOptions<User>['onEditingRowSave'] = async ({
-    values,
-    table,
-  }) => {
-    const newValidationErrors = validateUser(values);
-    if (Object.values(newValidationErrors).some((error) => error)) {
-      setValidationErrors(newValidationErrors);
-      return;
-    }
-    setValidationErrors({});
-    await updateUser(values);
-    table.setEditingRow(null);
-  };
-
-  // DELETE action
-  const openDeleteConfirmModal = (row: MRT_Row<User>) => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
-      deleteUser(row.original.id);
-    }
-  };
-
-  const table = useMaterialReactTable({
-    columns,
-    data: fetchedUsers,
-    createDisplayMode: 'row', // 'modal', 'custom' also available
-    editDisplayMode: 'row', // 'modal', 'cell', 'table', 'custom' available
-    enableEditing: true,
-    getRowId: (row) => row.id,
-    muiToolbarAlertBannerProps: isLoadingUsersError
-      ? {
-          color: 'error',
-          children: 'Error loading data',
-        }
-      : undefined,
-    muiTableContainerProps: {
-      sx: { minHeight: '500px' },
+// Create a client with optional default configuration
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: 1000 * 60 * 30,   // 30 minutes
+      retry: 3,
+      refetchOnWindowFocus: true,
     },
-    onCreatingRowCancel: () => setValidationErrors({}),
-    onCreatingRowSave: handleCreateUser,
-    onEditingRowCancel: () => setValidationErrors({}),
-    onEditingRowSave: handleSaveUser,
-    renderRowActions: ({ row, table }) => (
-      <Box sx={{ display: 'flex', gap: '1rem' }}>
-        <Tooltip title="Edit">
-          <IconButton onClick={() => table.setEditingRow(row)}>
-            <EditIcon />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="Delete">
-          <IconButton color="error" onClick={() => openDeleteConfirmModal(row)}>
-            <DeleteIcon />
-          </IconButton>
-        </Tooltip>
-      </Box>
-    ),
-    renderTopToolbarCustomActions: ({ table }) => (
-      <Button
-        variant="contained"
-        onClick={() => {
-          table.setCreatingRow(true);
-        }}
-      >
-        Create New User
-      </Button>
-    ),
-    state: {
-      isLoading: isLoadingUsers,
-      isSaving: isCreatingUser || isUpdatingUser || isDeletingUser,
-      showAlertBanner: isLoadingUsersError,
-      showProgressBars: isFetchingUsers,
+    mutations: {
+      retry: 0,
     },
-  });
+  },
+})
 
-  return <MaterialReactTable table={table} />;
-}
-
-// React Query CRUD hooks
-function useCreateUser() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (user: User) => {
-      await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(user),
-      });
-    },
-    onMutate: (newUserInfo: User) => {
-      queryClient.setQueryData(['users'], (prevUsers: any) => [
-        ...prevUsers,
-        { ...newUserInfo, id: (Math.random() + 1).toString(36).substring(7) },
-      ]);
-    },
-  });
-}
-
-function useGetUsers() {
-  return useQuery<User[]>({
-    queryKey: ['users'],
-    queryFn: async () => {
-      const response = await fetch('/api/users');
-      return response.json();
-    },
-    refetchOnWindowFocus: false,
-  });
-}
-
-function useUpdateUser() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (user: User) => {
-      await fetch(`/api/users/${user.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(user),
-      });
-    },
-    onMutate: (newUserInfo: User) => {
-      queryClient.setQueryData(['users'], (prevUsers: any) =>
-        prevUsers?.map((prevUser: User) =>
-          prevUser.id === newUserInfo.id ? newUserInfo : prevUser,
-        ),
-      );
-    },
-  });
-}
-
-function useDeleteUser() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (userId: string) => {
-      await fetch(`/api/users/${userId}`, { method: 'DELETE' });
-    },
-    onMutate: (userId: string) => {
-      queryClient.setQueryData(['users'], (prevUsers: any) =>
-        prevUsers?.filter((user: User) => user.id !== userId),
-      );
-    },
-  });
-}
-
-// Validation helpers
-const validateRequired = (value: string) => !!value.length;
-const validateEmail = (email: string) =>
-  !!email.length &&
-  email
-    .toLowerCase()
-    .match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
-
-function validateUser(user: User) {
-  return {
-    firstName: !validateRequired(user.firstName) ? 'First Name is Required' : '',
-    lastName: !validateRequired(user.lastName) ? 'Last Name is Required' : '',
-    email: !validateEmail(user.email) ? 'Incorrect Email Format' : '',
-  };
-}
-
-// App wrapper with React Query
-const queryClient = new QueryClient();
-
-export default function App() {
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Example />
+      <MyComponent />
     </QueryClientProvider>
-  );
+  )
 }
 ```
 
 ---
 
-## Aggregation and Grouping
+## useQuery - Basic Data Fetching
 
-Enable data grouping with aggregation functions and custom rendering.
+The `useQuery` hook is the primary way to fetch and cache data. It requires a unique query key and a query function that returns a promise.
 
 ```tsx
-import { useMemo } from 'react';
-import { Box, Stack } from '@mui/material';
-import {
-  MaterialReactTable,
-  useMaterialReactTable,
-  type MRT_ColumnDef,
-} from 'material-react-table';
+import { useQuery } from '@tanstack/react-query'
 
-type Person = {
-  firstName: string;
-  lastName: string;
-  age: number;
-  gender: string;
-  state: string;
-  salary: number;
-};
-
-const data: Person[] = [
-  {
-    firstName: 'John',
-    lastName: 'Doe',
-    age: 35,
-    gender: 'Male',
-    state: 'California',
-    salary: 75000,
-  },
-  {
-    firstName: 'Jane',
-    lastName: 'Smith',
-    age: 42,
-    gender: 'Female',
-    state: 'California',
-    salary: 85000,
-  },
-  {
-    firstName: 'Bob',
-    lastName: 'Johnson',
-    age: 28,
-    gender: 'Male',
-    state: 'Texas',
-    salary: 65000,
-  },
-];
-
-export default function Example() {
-  const averageSalary = useMemo(
-    () => data.reduce((acc, curr) => acc + curr.salary, 0) / data.length,
-    [],
-  );
-
-  const maxAge = useMemo(
-    () => data.reduce((acc, curr) => Math.max(acc, curr.age), 0),
-    [],
-  );
-
-  const columns = useMemo<MRT_ColumnDef<Person>[]>(
-    () => [
-      {
-        header: 'First Name',
-        accessorKey: 'firstName',
-        enableGrouping: false, // Prevent grouping by this column
-      },
-      {
-        header: 'Last Name',
-        accessorKey: 'lastName',
-      },
-      {
-        header: 'Age',
-        accessorKey: 'age',
-        aggregationFn: 'max', // Built-in aggregation function
-        AggregatedCell: ({ cell, table }) => (
-          <>
-            Oldest by{' '}
-            {table.getColumn(cell.row.groupingColumnId ?? '').columnDef.header}:{' '}
-            <Box
-              sx={{ color: 'info.main', display: 'inline', fontWeight: 'bold' }}
-            >
-              {cell.getValue<number>()}
-            </Box>
-          </>
-        ),
-        Footer: () => (
-          <Stack>
-            Max Age:
-            <Box color="warning.main">{Math.round(maxAge)}</Box>
-          </Stack>
-        ),
-      },
-      {
-        header: 'Gender',
-        accessorKey: 'gender',
-        GroupedCell: ({ cell, row }) => (
-          <Box sx={{ color: 'primary.main' }}>
-            <strong>{cell.getValue<string>()}s</strong> ({row.subRows?.length})
-          </Box>
-        ),
-      },
-      {
-        header: 'State',
-        accessorKey: 'state',
-      },
-      {
-        header: 'Salary',
-        accessorKey: 'salary',
-        aggregationFn: 'mean', // Average aggregation
-        AggregatedCell: ({ cell, table }) => (
-          <>
-            Average by{' '}
-            {table.getColumn(cell.row.groupingColumnId ?? '').columnDef.header}:{' '}
-            <Box sx={{ color: 'success.main', fontWeight: 'bold' }}>
-              {cell.getValue<number>()?.toLocaleString('en-US', {
-                style: 'currency',
-                currency: 'USD',
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-              })}
-            </Box>
-          </>
-        ),
-        Cell: ({ cell }) => (
-          <>
-            {cell.getValue<number>()?.toLocaleString('en-US', {
-              style: 'currency',
-              currency: 'USD',
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 0,
-            })}
-          </>
-        ),
-        Footer: () => (
-          <Stack>
-            Average Salary:
-            <Box color="warning.main">
-              {averageSalary?.toLocaleString('en-US', {
-                style: 'currency',
-                currency: 'USD',
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-              })}
-            </Box>
-          </Stack>
-        ),
-      },
-    ],
-    [averageSalary, maxAge],
-  );
-
-  const table = useMaterialReactTable({
-    columns,
+function TodoList() {
+  const {
     data,
-    displayColumnDefOptions: {
-      'mrt-row-expand': {
-        enableResizing: true,
-      },
+    isPending,
+    isError,
+    error,
+    isFetching,
+    isSuccess,
+    refetch,
+  } = useQuery({
+    queryKey: ['todos'],
+    queryFn: async () => {
+      const response = await fetch('/api/todos')
+      if (!response.ok) {
+        throw new Error('Failed to fetch todos')
+      }
+      return response.json()
     },
-    enableColumnResizing: true,
-    enableGrouping: true,
-    enableStickyHeader: true,
-    enableStickyFooter: true,
-    initialState: {
-      density: 'compact',
-      expanded: true, // Expand all groups by default
-      grouping: ['state'], // Group by state
-      pagination: { pageIndex: 0, pageSize: 20 },
-      sorting: [{ id: 'state', desc: false }],
-    },
-    muiToolbarAlertBannerChipProps: { color: 'primary' },
-    muiTableContainerProps: { sx: { maxHeight: 700 } },
-  });
+    staleTime: 1000 * 60, // Data is fresh for 1 minute
+    gcTime: 1000 * 60 * 5, // Cache persists for 5 minutes after unmount
+    retry: 2,
+    refetchOnWindowFocus: true,
+  })
 
-  return <MaterialReactTable table={table} />;
+  if (isPending) return <div>Loading...</div>
+  if (isError) return <div>Error: {error.message}</div>
+
+  return (
+    <div>
+      {isFetching && <span>Refreshing...</span>}
+      <ul>
+        {data.map((todo) => (
+          <li key={todo.id}>{todo.title}</li>
+        ))}
+      </ul>
+      <button onClick={() => refetch()}>Refresh</button>
+    </div>
+  )
 }
 ```
 
 ---
 
-## Custom Filter Functions
+## useQuery with Parameters
 
-Use custom filter functions for specialized filtering logic.
+Query keys can include variables that automatically trigger refetches when they change. This is essential for fetching data based on user input, route parameters, or other dynamic values.
 
 ```tsx
-import { useMemo } from 'react';
-import {
-  MaterialReactTable,
-  useMaterialReactTable,
-  type MRT_ColumnDef,
-  MRT_FilterFns,
-} from 'material-react-table';
+import { useQuery } from '@tanstack/react-query'
 
-type Product = {
-  id: string;
-  name: string;
-  price: number;
-  category: string;
-  tags: string[];
-};
-
-const data: Product[] = [
-  {
-    id: '1',
-    name: 'Laptop',
-    price: 1200,
-    category: 'Electronics',
-    tags: ['computer', 'portable', 'work'],
-  },
-  {
-    id: '2',
-    name: 'Mouse',
-    price: 25,
-    category: 'Electronics',
-    tags: ['computer', 'accessory'],
-  },
-];
-
-export default function Example() {
-  const columns = useMemo<MRT_ColumnDef<Product>[]>(
-    () => [
-      {
-        accessorKey: 'name',
-        header: 'Product Name',
-        filterFn: 'fuzzy', // Fuzzy matching filter
-      },
-      {
-        accessorKey: 'price',
-        header: 'Price',
-        filterVariant: 'range', // Range filter with min/max
-        filterFn: 'betweenInclusive',
-        Cell: ({ cell }) => `$${cell.getValue<number>()}`,
-      },
-      {
-        accessorKey: 'category',
-        header: 'Category',
-        filterVariant: 'select',
-        filterSelectOptions: ['Electronics', 'Clothing', 'Food'],
-        filterFn: 'equals',
-      },
-      {
-        accessorKey: 'tags',
-        header: 'Tags',
-        filterFn: 'arrIncludesSome', // Array filter - matches if any tag matches
-        Cell: ({ cell }) => cell.getValue<string[]>().join(', '),
-      },
-    ],
-    [],
-  );
-
-  const table = useMaterialReactTable({
-    columns,
-    data,
-    enableColumnFilterModes: true, // Allow switching filter modes
-    enableFacetedValues: true, // Show count of unique values
-    initialState: {
-      showColumnFilters: true,
+function UserProfile({ userId }) {
+  const { data: user, isPending } = useQuery({
+    queryKey: ['user', userId], // Refetches when userId changes
+    queryFn: async () => {
+      const response = await fetch(`/api/users/${userId}`)
+      if (!response.ok) throw new Error('User not found')
+      return response.json()
     },
-  });
+    enabled: !!userId, // Only fetch when userId is truthy
+  })
 
-  return <MaterialReactTable table={table} />;
+  if (isPending) return <div>Loading user...</div>
+
+  return (
+    <div>
+      <h2>{user.name}</h2>
+      <p>Email: {user.email}</p>
+    </div>
+  )
 }
 
-// Available filter functions:
-// - fuzzy: Best match filtering using ranking
-// - contains: Case-insensitive substring match
-// - startsWith: Starts with filter
-// - endsWith: Ends with filter
-// - equals: Exact match (case-insensitive)
-// - notEquals: Not equal
-// - between: Range filter (exclusive)
-// - betweenInclusive: Range filter (inclusive)
-// - greaterThan, greaterThanOrEqualTo: Numeric comparison
-// - lessThan, lessThanOrEqualTo: Numeric comparison
-// - isEmpty: Check if empty/null
-// - notEmpty: Check if not empty
-// - arrIncludes: Array exact match
-// - arrIncludesSome: Array matches any value
-// - arrIncludesAll: Array matches all values
+// Query with multiple parameters
+function SearchResults({ query, page, filters }) {
+  const { data } = useQuery({
+    queryKey: ['search', query, page, filters],
+    queryFn: () => searchAPI({ query, page, ...filters }),
+    enabled: query.length > 2,
+    placeholderData: (previousData) => previousData, // Keep previous data while fetching
+  })
+
+  return <ResultsList results={data?.results} />
+}
 ```
 
 ---
 
-## Column Customization and Styling
+## useMutation - Data Modifications
 
-Customize column appearance, behavior, and Material UI props.
+The `useMutation` hook handles create, update, and delete operations with built-in support for callbacks, error handling, and cache invalidation.
 
 ```tsx
-import { useMemo } from 'react';
-import {
-  MaterialReactTable,
-  useMaterialReactTable,
-  type MRT_ColumnDef,
-} from 'material-react-table';
-import { Box, Chip } from '@mui/material';
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 
-type Employee = {
-  id: string;
-  name: string;
-  department: string;
-  status: 'active' | 'inactive';
-  salary: number;
-};
+function AddTodo() {
+  const queryClient = useQueryClient()
+  const [title, setTitle] = useState('')
 
-const data: Employee[] = [
-  {
-    id: '1',
-    name: 'John Doe',
-    department: 'Engineering',
-    status: 'active',
-    salary: 95000,
+  const mutation = useMutation({
+    mutationFn: async (newTodo) => {
+      const response = await fetch('/api/todos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newTodo),
+      })
+      if (!response.ok) throw new Error('Failed to create todo')
+      return response.json()
+    },
+    onSuccess: (data) => {
+      // Invalidate and refetch todos list
+      queryClient.invalidateQueries({ queryKey: ['todos'] })
+      setTitle('')
+    },
+    onError: (error) => {
+      console.error('Mutation failed:', error.message)
+    },
+    onSettled: () => {
+      // Runs on both success and error
+      console.log('Mutation completed')
+    },
+  })
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        mutation.mutate({ title, completed: false })
+      }}
+    >
+      <input
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        disabled={mutation.isPending}
+      />
+      <button type="submit" disabled={mutation.isPending}>
+        {mutation.isPending ? 'Adding...' : 'Add Todo'}
+      </button>
+      {mutation.isError && <p>Error: {mutation.error.message}</p>}
+    </form>
+  )
+}
+```
+
+---
+
+## useMutation with Optimistic Updates
+
+Optimistic updates allow immediate UI feedback while mutations are in progress, with automatic rollback on failure.
+
+```tsx
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+
+function TodoItem({ todo }) {
+  const queryClient = useQueryClient()
+
+  const updateMutation = useMutation({
+    mutationFn: async (updatedTodo) => {
+      const response = await fetch(`/api/todos/${updatedTodo.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedTodo),
+      })
+      if (!response.ok) throw new Error('Update failed')
+      return response.json()
+    },
+    onMutate: async (newTodo) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['todos'] })
+
+      // Snapshot previous value
+      const previousTodos = queryClient.getQueryData(['todos'])
+
+      // Optimistically update cache
+      queryClient.setQueryData(['todos'], (old) =>
+        old.map((t) => (t.id === newTodo.id ? newTodo : t))
+      )
+
+      // Return context for rollback
+      return { previousTodos }
+    },
+    onError: (err, newTodo, context) => {
+      // Rollback on error
+      queryClient.setQueryData(['todos'], context.previousTodos)
+    },
+    onSettled: () => {
+      // Refetch to ensure server state
+      queryClient.invalidateQueries({ queryKey: ['todos'] })
+    },
+  })
+
+  const toggleComplete = () => {
+    updateMutation.mutate({ ...todo, completed: !todo.completed })
+  }
+
+  return (
+    <li style={{ opacity: updateMutation.isPending ? 0.5 : 1 }}>
+      <input
+        type="checkbox"
+        checked={todo.completed}
+        onChange={toggleComplete}
+      />
+      {todo.title}
+    </li>
+  )
+}
+```
+
+---
+
+## useInfiniteQuery - Pagination and Infinite Scroll
+
+The `useInfiniteQuery` hook supports paginated data with load-more or infinite scroll functionality.
+
+```tsx
+import { useInfiniteQuery } from '@tanstack/react-query'
+import { useInView } from 'react-intersection-observer'
+
+function InfiniteList() {
+  const { ref, inView } = useInView()
+
+  const {
+    data,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
+    status,
+  } = useInfiniteQuery({
+    queryKey: ['items'],
+    queryFn: async ({ pageParam }) => {
+      const response = await fetch(`/api/items?cursor=${pageParam}&limit=20`)
+      return response.json()
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    getPreviousPageParam: (firstPage) => firstPage.prevCursor ?? undefined,
+    maxPages: 5, // Limit stored pages for memory optimization
+  })
+
+  // Auto-fetch when scrolling to bottom
+  React.useEffect(() => {
+    if (inView && hasNextPage && !isFetching) {
+      fetchNextPage()
+    }
+  }, [inView, hasNextPage, isFetching, fetchNextPage])
+
+  if (status === 'pending') return <div>Loading...</div>
+  if (status === 'error') return <div>Error: {error.message}</div>
+
+  return (
+    <div>
+      {data.pages.map((page, pageIndex) => (
+        <React.Fragment key={pageIndex}>
+          {page.items.map((item) => (
+            <div key={item.id}>{item.name}</div>
+          ))}
+        </React.Fragment>
+      ))}
+
+      <div ref={ref}>
+        {isFetchingNextPage
+          ? 'Loading more...'
+          : hasNextPage
+          ? 'Load more'
+          : 'No more items'}
+      </div>
+    </div>
+  )
+}
+```
+
+---
+
+## Query Invalidation and Cache Management
+
+Programmatically invalidate, refetch, or update cached data using the QueryClient methods.
+
+```tsx
+import { useQueryClient } from '@tanstack/react-query'
+
+function CacheManagement() {
+  const queryClient = useQueryClient()
+
+  // Invalidate all queries starting with 'todos'
+  const invalidateTodos = () => {
+    queryClient.invalidateQueries({ queryKey: ['todos'] })
+  }
+
+  // Invalidate specific query
+  const invalidateUser = (userId) => {
+    queryClient.invalidateQueries({ queryKey: ['user', userId] })
+  }
+
+  // Invalidate with exact match only
+  const invalidateExact = () => {
+    queryClient.invalidateQueries({ queryKey: ['todos'], exact: true })
+  }
+
+  // Invalidate using predicate
+  const invalidateStale = () => {
+    queryClient.invalidateQueries({
+      predicate: (query) =>
+        query.queryKey[0] === 'todos' &&
+        query.state.dataUpdatedAt < Date.now() - 60000,
+    })
+  }
+
+  // Directly update cache
+  const updateTodoInCache = (todoId, updates) => {
+    queryClient.setQueryData(['todos'], (oldTodos) =>
+      oldTodos?.map((todo) =>
+        todo.id === todoId ? { ...todo, ...updates } : todo
+      )
+    )
+  }
+
+  // Get cached data
+  const getCachedTodos = () => {
+    return queryClient.getQueryData(['todos'])
+  }
+
+  // Remove query from cache
+  const removeTodosCache = () => {
+    queryClient.removeQueries({ queryKey: ['todos'] })
+  }
+
+  // Refetch all active queries
+  const refetchAll = () => {
+    queryClient.refetchQueries({ type: 'active' })
+  }
+
+  return (
+    <div>
+      <button onClick={invalidateTodos}>Invalidate Todos</button>
+      <button onClick={refetchAll}>Refetch All Active</button>
+    </div>
+  )
+}
+```
+
+---
+
+## Prefetching Data
+
+Prefetch data before it's needed to improve perceived performance, such as on hover or route changes.
+
+```tsx
+import { useQueryClient } from '@tanstack/react-query'
+
+function UserList({ users }) {
+  const queryClient = useQueryClient()
+
+  // Prefetch on hover
+  const prefetchUser = async (userId) => {
+    await queryClient.prefetchQuery({
+      queryKey: ['user', userId],
+      queryFn: () => fetchUser(userId),
+      staleTime: 1000 * 60 * 5, // Only prefetch if stale
+    })
+  }
+
+  return (
+    <ul>
+      {users.map((user) => (
+        <li
+          key={user.id}
+          onMouseEnter={() => prefetchUser(user.id)}
+          onFocus={() => prefetchUser(user.id)}
+        >
+          <Link to={`/users/${user.id}`}>{user.name}</Link>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+// Prefetch in route loader (with React Router or TanStack Router)
+const userRoute = {
+  path: '/users/:userId',
+  loader: async ({ params }) => {
+    await queryClient.prefetchQuery({
+      queryKey: ['user', params.userId],
+      queryFn: () => fetchUser(params.userId),
+    })
   },
-];
+  component: UserProfile,
+}
 
-export default function Example() {
-  const columns = useMemo<MRT_ColumnDef<Employee>[]>(
-    () => [
-      {
-        accessorKey: 'name',
-        header: 'Employee Name',
-        size: 200,
-        minSize: 150,
-        maxSize: 300,
-        enableColumnOrdering: true,
-        enablePinning: true,
-        muiTableHeadCellProps: {
-          sx: {
-            fontWeight: 'bold',
-            fontSize: '16px',
-            color: 'primary.main',
-          },
-        },
-        muiTableBodyCellProps: {
-          sx: {
-            backgroundColor: 'background.paper',
-          },
-        },
-      },
-      {
-        accessorKey: 'department',
-        header: 'Department',
-        enableColumnFilter: true,
-        filterVariant: 'multi-select',
-        muiTableHeadCellProps: {
-          align: 'center',
-        },
-        muiTableBodyCellProps: {
-          align: 'center',
-        },
-      },
-      {
-        accessorKey: 'status',
-        header: 'Status',
-        Cell: ({ cell }) => {
-          const status = cell.getValue<string>();
-          return (
-            <Chip
-              label={status}
-              color={status === 'active' ? 'success' : 'default'}
-              size="small"
-            />
-          );
-        },
-        muiTableBodyCellProps: ({ cell }) => ({
-          sx: {
-            backgroundColor:
-              cell.getValue<string>() === 'active'
-                ? 'success.light'
-                : 'grey.100',
-          },
-        }),
-      },
-      {
-        accessorKey: 'salary',
-        header: 'Salary',
-        Cell: ({ cell }) => (
-          <Box sx={{ textAlign: 'right' }}>
-            {cell.getValue<number>().toLocaleString('en-US', {
-              style: 'currency',
-              currency: 'USD',
-            })}
-          </Box>
-        ),
-        muiTableHeadCellProps: {
-          align: 'right',
-        },
-        muiTableBodyCellProps: {
-          align: 'right',
-          sx: {
-            fontFamily: 'monospace',
-          },
-        },
-      },
-    ],
-    [],
-  );
-
-  const table = useMaterialReactTable({
-    columns,
-    data,
-    enableColumnOrdering: true,
-    enableColumnPinning: true,
-    enableColumnResizing: true,
-    columnResizeMode: 'onChange',
-    layoutMode: 'grid', // Alternative: 'semantic'
-    muiTableProps: {
-      sx: {
-        border: '1px solid rgba(81, 81, 81, 0.5)',
-      },
-    },
-    muiTableHeadProps: {
-      sx: {
-        backgroundColor: 'primary.light',
-      },
-    },
-    muiTableBodyProps: {
-      sx: {
-        '& tr:nth-of-type(odd)': {
-          backgroundColor: 'grey.50',
-        },
-      },
-    },
-  });
-
-  return <MaterialReactTable table={table} />;
+// Ensure data exists or fetch
+async function ensureUserData(userId) {
+  const data = await queryClient.ensureQueryData({
+    queryKey: ['user', userId],
+    queryFn: () => fetchUser(userId),
+  })
+  return data
 }
 ```
 
 ---
 
-## Virtualization for Large Datasets
+## useSuspenseQuery - React Suspense Integration
 
-Enable row and column virtualization for rendering thousands of rows efficiently.
+Use TanStack Query with React Suspense for cleaner loading states and error boundaries.
 
 ```tsx
-import { useMemo } from 'react';
-import {
-  MaterialReactTable,
-  useMaterialReactTable,
-  type MRT_ColumnDef,
-} from 'material-react-table';
+import { useSuspenseQuery } from '@tanstack/react-query'
+import { Suspense } from 'react'
+import { ErrorBoundary } from 'react-error-boundary'
+import { QueryErrorResetBoundary } from '@tanstack/react-query'
 
-type Row = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  city: string;
-  state: string;
-};
+function UserProfile({ userId }) {
+  // data is guaranteed to be defined (no isPending check needed)
+  const { data: user } = useSuspenseQuery({
+    queryKey: ['user', userId],
+    queryFn: () => fetchUser(userId),
+  })
 
-// Generate large dataset
-const data: Row[] = Array.from({ length: 10000 }, (_, i) => ({
-  id: String(i),
-  firstName: `FirstName${i}`,
-  lastName: `LastName${i}`,
-  email: `user${i}@example.com`,
-  city: `City${i}`,
-  state: `State${i % 50}`,
-}));
+  return (
+    <div>
+      <h2>{user.name}</h2>
+      <p>{user.email}</p>
+    </div>
+  )
+}
 
-export default function Example() {
-  const columns = useMemo<MRT_ColumnDef<Row>[]>(
-    () => [
-      {
-        accessorKey: 'id',
-        header: 'ID',
-        size: 100,
-      },
-      {
-        accessorKey: 'firstName',
-        header: 'First Name',
-        size: 150,
-      },
-      {
-        accessorKey: 'lastName',
-        header: 'Last Name',
-        size: 150,
-      },
-      {
-        accessorKey: 'email',
-        header: 'Email',
-        size: 200,
-      },
-      {
-        accessorKey: 'city',
-        header: 'City',
-        size: 150,
-      },
-      {
-        accessorKey: 'state',
-        header: 'State',
-        size: 150,
-      },
-    ],
-    [],
-  );
-
-  const table = useMaterialReactTable({
-    columns,
-    data,
-    enableRowVirtualization: true, // Enable row virtualization
-    enableColumnVirtualization: true, // Enable column virtualization (optional)
-    enablePagination: false, // Disable pagination with virtualization
-    enableRowNumbers: true,
-    muiTableContainerProps: {
-      sx: { maxHeight: '600px' },
-    },
-    rowVirtualizerOptions: {
-      overscan: 10, // Number of rows to render outside viewport
-      estimateSize: () => 50, // Estimated row height in pixels
-    },
-    columnVirtualizerOptions: {
-      overscan: 2,
-    },
-  });
-
-  return <MaterialReactTable table={table} />;
+function App() {
+  return (
+    <QueryErrorResetBoundary>
+      {({ reset }) => (
+        <ErrorBoundary
+          onReset={reset}
+          fallbackRender={({ resetErrorBoundary, error }) => (
+            <div>
+              <p>Error: {error.message}</p>
+              <button onClick={resetErrorBoundary}>Retry</button>
+            </div>
+          )}
+        >
+          <Suspense fallback={<div>Loading user...</div>}>
+            <UserProfile userId={1} />
+          </Suspense>
+        </ErrorBoundary>
+      )}
+    </QueryErrorResetBoundary>
+  )
 }
 ```
 
 ---
 
-## Localization Support
+## Dependent Queries
 
-Use built-in localization or provide custom translations.
+Execute queries that depend on the results of other queries using the `enabled` option.
 
 ```tsx
-import { useMemo } from 'react';
-import {
-  MaterialReactTable,
-  useMaterialReactTable,
-  type MRT_ColumnDef,
-  type MRT_Localization,
-} from 'material-react-table';
-// Import built-in locales
-import { MRT_Localization_ES } from 'material-react-table/locales/es';
-import { MRT_Localization_FR } from 'material-react-table/locales/fr';
-import { MRT_Localization_DE } from 'material-react-table/locales/de';
+import { useQuery } from '@tanstack/react-query'
 
-type Person = {
-  name: string;
-  age: number;
-  city: string;
-};
+function UserPosts({ userId }) {
+  // First query - fetch user
+  const { data: user } = useQuery({
+    queryKey: ['user', userId],
+    queryFn: () => fetchUser(userId),
+  })
 
-const data: Person[] = [
-  { name: 'Juan', age: 30, city: 'Madrid' },
-  { name: 'Maria', age: 25, city: 'Barcelona' },
-];
+  // Dependent query - fetch posts only after user is loaded
+  const { data: posts, isPending: postsLoading } = useQuery({
+    queryKey: ['posts', user?.id],
+    queryFn: () => fetchPostsByUser(user.id),
+    enabled: !!user?.id, // Only runs when user.id exists
+  })
 
-export default function Example() {
-  const columns = useMemo<MRT_ColumnDef<Person>[]>(
-    () => [
-      {
-        accessorKey: 'name',
-        header: 'Nombre',
-      },
-      {
-        accessorKey: 'age',
-        header: 'Edad',
-      },
-      {
-        accessorKey: 'city',
-        header: 'Ciudad',
-      },
-    ],
-    [],
-  );
+  // Dependent query - fetch user's team
+  const { data: team } = useQuery({
+    queryKey: ['team', user?.teamId],
+    queryFn: () => fetchTeam(user.teamId),
+    enabled: !!user?.teamId,
+  })
 
-  // Use built-in Spanish localization
-  const table = useMaterialReactTable({
-    columns,
-    data,
-    localization: MRT_Localization_ES,
-  });
+  if (!user) return <div>Loading user...</div>
 
-  return <MaterialReactTable table={table} />;
+  return (
+    <div>
+      <h2>{user.name}</h2>
+      {postsLoading ? (
+        <p>Loading posts...</p>
+      ) : (
+        <ul>
+          {posts?.map((post) => (
+            <li key={post.id}>{post.title}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+```
+
+---
+
+## Parallel Queries with useQueries
+
+Execute multiple queries in parallel and handle their results together.
+
+```tsx
+import { useQueries } from '@tanstack/react-query'
+
+function Dashboard({ userIds }) {
+  const userQueries = useQueries({
+    queries: userIds.map((id) => ({
+      queryKey: ['user', id],
+      queryFn: () => fetchUser(id),
+      staleTime: 1000 * 60 * 5,
+    })),
+    combine: (results) => {
+      return {
+        data: results.map((result) => result.data),
+        isPending: results.some((result) => result.isPending),
+        isError: results.some((result) => result.isError),
+        errors: results.filter((result) => result.error).map((r) => r.error),
+      }
+    },
+  })
+
+  if (userQueries.isPending) return <div>Loading users...</div>
+  if (userQueries.isError) {
+    return <div>Errors: {userQueries.errors.map((e) => e.message).join(', ')}</div>
+  }
+
+  return (
+    <div>
+      {userQueries.data.map((user) => (
+        <UserCard key={user.id} user={user} />
+      ))}
+    </div>
+  )
+}
+```
+
+---
+
+## Query Options and Reusable Query Factories
+
+Create reusable query configurations with `queryOptions` for better code organization and type safety.
+
+```tsx
+import { queryOptions, useQuery, useSuspenseQuery } from '@tanstack/react-query'
+
+// Define reusable query options
+const todosQueryOptions = queryOptions({
+  queryKey: ['todos'],
+  queryFn: fetchTodos,
+  staleTime: 1000 * 60 * 5,
+})
+
+const userQueryOptions = (userId: string) =>
+  queryOptions({
+    queryKey: ['user', userId],
+    queryFn: () => fetchUser(userId),
+    staleTime: 1000 * 60 * 10,
+  })
+
+const postQueryOptions = (postId: string) =>
+  queryOptions({
+    queryKey: ['post', postId],
+    queryFn: () => fetchPost(postId),
+  })
+
+// Use in components
+function TodoList() {
+  const { data } = useQuery(todosQueryOptions)
+  return <ul>{data?.map((todo) => <li key={todo.id}>{todo.title}</li>)}</ul>
 }
 
-// Custom localization example
-const customLocalization: Partial<MRT_Localization> = {
-  actions: 'Acciones',
-  cancel: 'Cancelar',
-  save: 'Guardar',
-  search: 'Buscar',
-  clearFilter: 'Limpiar filtro',
-  clearSearch: 'Limpiar búsqueda',
-  clearSort: 'Limpiar orden',
-  columnActions: 'Acciones de columna',
-  edit: 'Editar',
-  expand: 'Expandir',
-  expandAll: 'Expandir todo',
-  filterByColumn: 'Filtrar por {column}',
-  filterMode: 'Modo de filtro: {filterType}',
-  hideAll: 'Ocultar todo',
-  hideColumn: 'Ocultar columna de {column}',
-  rowsPerPage: 'Filas por página',
-  showAll: 'Mostrar todo',
-  showAllColumns: 'Mostrar todas las columnas',
-  showHideColumns: 'Mostrar/Ocultar columnas',
-  showHideFilters: 'Mostrar/Ocultar filtros',
-  showHideSearch: 'Mostrar/Ocultar búsqueda',
-  sortByColumnAsc: 'Ordenar por {column} ascendente',
-  sortByColumnDesc: 'Ordenar por {column} descendente',
-};
+function UserProfile({ userId }) {
+  const { data: user } = useSuspenseQuery(userQueryOptions(userId))
+  return <div>{user.name}</div>
+}
 
-// Available built-in locales (38+ languages):
-// ar, az, bg, cs, da, de, el, en, es, et, fa, fi, fr, he, hr, hu, hy,
-// id, it, ja, ko, mk, nl, no, np, pl, pt, pt-BR, ro, ru, sk,
-// sr-Cyrl-RS, sr-Latn-RS, sv, tr, uk, vi, zh-Hans, zh-Hant
+// Use for prefetching
+async function prefetchUser(queryClient, userId) {
+  await queryClient.prefetchQuery(userQueryOptions(userId))
+}
+
+// Use for cache manipulation
+function updateUserCache(queryClient, userId, updates) {
+  queryClient.setQueryData(userQueryOptions(userId).queryKey, (old) => ({
+    ...old,
+    ...updates,
+  }))
+}
 ```
 
 ---
 
-## Installation
+## Vue Query
 
-Install Material React Table and peer dependencies.
+TanStack Query for Vue uses the same core concepts with Vue's reactivity system and Composition API.
 
-```bash
-# Install peer dependencies (Material UI V6)
-npm install @mui/material @mui/x-date-pickers @mui/icons-material @emotion/react @emotion/styled
+```vue
+<script setup>
+import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
+import { computed } from 'vue'
 
-# Install Material React Table
-npm install material-react-table
+const queryClient = useQueryClient()
 
-# Or with yarn
-yarn add @mui/material @mui/x-date-pickers @mui/icons-material @emotion/react @emotion/styled
-yarn add material-react-table
+// Basic query
+const { data: todos, isPending, isError, error } = useQuery({
+  queryKey: ['todos'],
+  queryFn: async () => {
+    const response = await fetch('/api/todos')
+    return response.json()
+  },
+})
 
-# Or with pnpm
-pnpm add @mui/material @mui/x-date-pickers @mui/icons-material @emotion/react @emotion/styled
-pnpm add material-react-table
+// Query with reactive parameters
+const props = defineProps(['userId'])
+const { data: user } = useQuery({
+  queryKey: computed(() => ['user', props.userId]),
+  queryFn: () => fetchUser(props.userId),
+  enabled: computed(() => !!props.userId),
+})
+
+// Mutation
+const { mutate: addTodo, isPending: isAdding } = useMutation({
+  mutationFn: (newTodo) => fetch('/api/todos', {
+    method: 'POST',
+    body: JSON.stringify(newTodo),
+  }),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['todos'] })
+  },
+})
+
+const handleAdd = () => {
+  addTodo({ title: 'New Todo', completed: false })
+}
+</script>
+
+<template>
+  <div>
+    <div v-if="isPending">Loading...</div>
+    <div v-else-if="isError">Error: {{ error.message }}</div>
+    <ul v-else>
+      <li v-for="todo in todos" :key="todo.id">{{ todo.title }}</li>
+    </ul>
+    <button @click="handleAdd" :disabled="isAdding">
+      {{ isAdding ? 'Adding...' : 'Add Todo' }}
+    </button>
+  </div>
+</template>
 ```
 
 ---
 
-## TypeScript Types
+## Solid Query
 
-Core TypeScript types for type-safe table configuration.
+TanStack Query for SolidJS integrates with Solid's reactivity primitives and Suspense.
+
+```tsx
+import { ErrorBoundary, Suspense, For } from 'solid-js'
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/solid-query'
+
+const queryClient = new QueryClient()
+
+function TodoApp() {
+  const queryClient = useQueryClient()
+
+  // Query with getter function for reactive options
+  const todosQuery = useQuery(() => ({
+    queryKey: ['todos'],
+    queryFn: async () => {
+      const response = await fetch('/api/todos')
+      if (!response.ok) throw new Error('Failed to fetch')
+      return response.json()
+    },
+    staleTime: 1000 * 60 * 5,
+    throwOnError: true,
+  }))
+
+  const addTodoMutation = useMutation(() => ({
+    mutationFn: (newTodo) =>
+      fetch('/api/todos', {
+        method: 'POST',
+        body: JSON.stringify(newTodo),
+      }).then((r) => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['todos'] })
+    },
+  }))
+
+  return (
+    <ErrorBoundary fallback={<div>Something went wrong!</div>}>
+      <Suspense fallback={<div>Loading...</div>}>
+        <ul>
+          <For each={todosQuery.data}>
+            {(todo) => <li>{todo.title}</li>}
+          </For>
+        </ul>
+        <button
+          onClick={() => addTodoMutation.mutate({ title: 'New Todo' })}
+          disabled={addTodoMutation.isPending}
+        >
+          Add Todo
+        </button>
+      </Suspense>
+    </ErrorBoundary>
+  )
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TodoApp />
+    </QueryClientProvider>
+  )
+}
+```
+
+---
+
+## Angular Query
+
+TanStack Query for Angular uses signals and dependency injection patterns.
 
 ```typescript
-import type {
-  MRT_ColumnDef,
-  MRT_TableOptions,
-  MRT_TableInstance,
-  MRT_Row,
-  MRT_Cell,
-  MRT_Column,
-  MRT_RowData,
-  MRT_ColumnFiltersState,
-  MRT_SortingState,
-  MRT_PaginationState,
-  MRT_RowSelectionState,
-} from 'material-react-table';
+import { Component, inject } from '@angular/core'
+import { HttpClient } from '@angular/common/http'
+import {
+  injectQuery,
+  injectMutation,
+  injectQueryClient,
+} from '@tanstack/angular-query-experimental'
+import { lastValueFrom } from 'rxjs'
 
-// Define your data type
-type User = {
-  id: string;
-  name: string;
-  email: string;
-  age: number;
-};
+interface Todo {
+  id: number
+  title: string
+  completed: boolean
+}
 
-// Column definition with type safety
-const columns: MRT_ColumnDef<User>[] = [
-  {
-    accessorKey: 'name',
-    header: 'Name',
-    Cell: ({ cell }) => cell.getValue<string>(),
-  },
-  {
-    accessorKey: 'age',
-    header: 'Age',
-    Cell: ({ cell }) => cell.getValue<number>(),
-  },
-];
+@Component({
+  selector: 'app-todos',
+  template: `
+    @if (todosQuery.isPending()) {
+      <div>Loading...</div>
+    }
+    @if (todosQuery.error()) {
+      <div>Error: {{ todosQuery.error()?.message }}</div>
+    }
+    @if (todosQuery.data(); as todos) {
+      <ul>
+        @for (todo of todos; track todo.id) {
+          <li>{{ todo.title }}</li>
+        }
+      </ul>
+    }
+    <button
+      (click)="addTodo()"
+      [disabled]="addTodoMutation.isPending()"
+    >
+      {{ addTodoMutation.isPending() ? 'Adding...' : 'Add Todo' }}
+    </button>
+  `,
+})
+export class TodosComponent {
+  private http = inject(HttpClient)
+  private queryClient = injectQueryClient()
 
-// Table options with type safety
-const tableOptions: MRT_TableOptions<User> = {
-  columns,
-  data: [],
-  enableRowSelection: true,
-  onRowSelectionChange: (updater) => {
-    // Type-safe state updater
-  },
-};
+  todosQuery = injectQuery(() => ({
+    queryKey: ['todos'],
+    queryFn: () =>
+      lastValueFrom(this.http.get<Todo[]>('/api/todos')),
+  }))
 
-// Access typed table instance
-function handleTableInstance(table: MRT_TableInstance<User>) {
-  const selectedRows: MRT_Row<User>[] = table.getSelectedRowModel().rows;
-  const firstRow: User = selectedRows[0].original;
-  const state: MRT_RowSelectionState = table.getState().rowSelection;
+  addTodoMutation = injectMutation(() => ({
+    mutationFn: (newTodo: Partial<Todo>) =>
+      lastValueFrom(this.http.post<Todo>('/api/todos', newTodo)),
+    onSuccess: () => {
+      this.queryClient.invalidateQueries({ queryKey: ['todos'] })
+    },
+  }))
+
+  addTodo() {
+    this.addTodoMutation.mutate({ title: 'New Todo', completed: false })
+  }
 }
 ```
 
 ---
 
-## Main API Configuration
+## Server-Side Rendering (SSR) and Hydration
 
-Primary configuration options for table behavior and features.
+Configure TanStack Query for SSR with proper hydration to avoid refetching on the client.
 
-```typescript
+```tsx
+// Server-side: Prefetch and dehydrate
 import {
-  MaterialReactTable,
-  useMaterialReactTable,
-  type MRT_TableOptions,
-} from 'material-react-table';
+  QueryClient,
+  dehydrate,
+  HydrationBoundary,
+} from '@tanstack/react-query'
 
-type Data = {
-  id: string;
-  name: string;
-};
+// Next.js App Router example
+async function PostsPage() {
+  const queryClient = new QueryClient()
 
-const data: Data[] = [];
-const columns = [];
+  await queryClient.prefetchQuery({
+    queryKey: ['posts'],
+    queryFn: fetchPosts,
+  })
 
-const tableOptions: MRT_TableOptions<Data> = {
-  // Required
-  columns, // Column definitions
-  data, // Table data
+  return (
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <PostsList />
+    </HydrationBoundary>
+  )
+}
 
-  // Feature toggles (all optional, most default to true)
-  enableSorting: true,
-  enableMultiSort: true,
-  enableFiltering: true,
-  enableColumnFilters: true,
-  enableGlobalFilter: true,
-  enablePagination: true,
-  enableRowSelection: true,
-  enableMultiRowSelection: true,
-  enableRowNumbers: false,
-  enableRowActions: false,
-  enableRowOrdering: false,
-  enableRowDragging: false,
-  enableRowPinning: false,
-  enableColumnOrdering: false,
-  enableColumnDragging: true,
-  enableColumnPinning: false,
-  enableColumnResizing: false,
-  enableEditing: false,
-  enableExpanding: false,
-  enableGrouping: false,
-  enableDensityToggle: true,
-  enableFullScreenToggle: true,
-  enableClickToCopy: false,
-  enableCellActions: false,
-  enableStickyHeader: false,
-  enableStickyFooter: false,
-  enableRowVirtualization: false,
-  enableColumnVirtualization: false,
-  enableKeyboardShortcuts: true,
+// Client component
+'use client'
+import { useQuery } from '@tanstack/react-query'
 
-  // State management
-  state: {
-    columnFilters: [],
-    globalFilter: '',
-    sorting: [],
-    pagination: { pageIndex: 0, pageSize: 10 },
-    rowSelection: {},
-    columnOrder: [],
-    columnPinning: { left: [], right: [] },
-    expanded: {},
-    grouping: [],
-  },
+function PostsList() {
+  // This will use the prefetched data without refetching
+  const { data: posts } = useQuery({
+    queryKey: ['posts'],
+    queryFn: fetchPosts,
+    staleTime: 1000 * 60 * 5,
+  })
 
-  // Initial state (set defaults)
-  initialState: {
-    density: 'comfortable', // 'comfortable' | 'compact' | 'spacious'
-    showColumnFilters: false,
-    showGlobalFilter: true,
-    pagination: { pageIndex: 0, pageSize: 25 },
-  },
+  return (
+    <ul>
+      {posts?.map((post) => (
+        <li key={post.id}>{post.title}</li>
+      ))}
+    </ul>
+  )
+}
 
-  // State change callbacks
-  onColumnFiltersChange: (updater) => {},
-  onGlobalFilterChange: (updater) => {},
-  onSortingChange: (updater) => {},
-  onPaginationChange: (updater) => {},
-  onRowSelectionChange: (updater) => {},
-  onColumnOrderChange: (updater) => {},
+// Provider setup for SSR
+'use client'
+import { QueryClient, QueryClientProvider, isServer } from '@tanstack/react-query'
 
-  // Editing callbacks
-  onCreatingRowSave: async ({ values, table }) => {},
-  onCreatingRowCancel: () => {},
-  onEditingRowSave: async ({ values, table }) => {},
-  onEditingRowCancel: () => {},
+function makeQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 60 * 1000, // Prevent immediate refetch on client
+      },
+    },
+  })
+}
 
-  // Display modes
-  editDisplayMode: 'modal', // 'modal' | 'row' | 'cell' | 'table' | 'custom'
-  createDisplayMode: 'modal', // 'modal' | 'row' | 'custom'
+let browserQueryClient: QueryClient | undefined
 
-  // Layout
-  layoutMode: 'semantic', // 'semantic' | 'grid'
-  columnResizeMode: 'onChange', // 'onChange' | 'onEnd'
+function getQueryClient() {
+  if (isServer) {
+    return makeQueryClient()
+  }
+  if (!browserQueryClient) {
+    browserQueryClient = makeQueryClient()
+  }
+  return browserQueryClient
+}
 
-  // Row configuration
-  getRowId: (originalRow) => originalRow.id,
-  enableRowSelection: (row) => row.original.isSelectable,
-
-  // Custom render functions
-  renderTopToolbarCustomActions: ({ table }) => <div>Actions</div>,
-  renderBottomToolbarCustomActions: ({ table }) => <div>Footer</div>,
-  renderDetailPanel: ({ row }) => <div>Details</div>,
-  renderRowActions: ({ row, table }) => <div>Actions</div>,
-  renderToolbarInternalActions: ({ table }) => <div>Internal</div>,
-
-  // Material UI component props (50+ customization points)
-  muiTableProps: { sx: {} },
-  muiTableHeadProps: { sx: {} },
-  muiTableHeadCellProps: { sx: {} },
-  muiTableBodyProps: { sx: {} },
-  muiTableBodyCellProps: { sx: {} },
-  muiTableBodyRowProps: { sx: {} },
-  muiTablePaginationProps: {},
-  muiToolbarAlertBannerProps: {},
-  muiFilterTextFieldProps: {},
-  muiEditTextFieldProps: {},
-
-  // Display column options
-  displayColumnDefOptions: {
-    'mrt-row-select': { size: 50 },
-    'mrt-row-expand': { size: 60 },
-    'mrt-row-numbers': { size: 50 },
-    'mrt-row-actions': { size: 120 },
-  },
-
-  // Other options
-  rowCount: 100, // For server-side pagination
-  manualFiltering: false, // Server-side filtering
-  manualPagination: false, // Server-side pagination
-  manualSorting: false, // Server-side sorting
-  positionActionsColumn: 'last', // 'first' | 'last'
-  positionExpandColumn: 'first', // 'first' | 'last'
-  positionGlobalFilter: 'left', // 'left' | 'right'
-  positionPagination: 'bottom', // 'bottom' | 'top' | 'both'
-  positionToolbarAlertBanner: 'top', // 'top' | 'bottom' | 'none'
-  defaultColumn: {}, // Default column options
-  localization: {}, // i18n strings
-};
-
-const table = useMaterialReactTable(tableOptions);
+export function Providers({ children }) {
+  const queryClient = getQueryClient()
+  return (
+    <QueryClientProvider client={queryClient}>
+      {children}
+    </QueryClientProvider>
+  )
+}
 ```
 
 ---
 
-Material React Table provides a comprehensive solution for building feature-rich data tables in React applications. Its primary use cases include admin dashboards, data management interfaces, reporting tools, and any application requiring advanced table functionality. The library excels at CRUD operations, complex filtering and sorting, large dataset handling through virtualization, and data aggregation and grouping.
+## DevTools
 
-Integration patterns are flexible and straightforward. For state management, the library works seamlessly with React Query for server-side operations, supports external state management with useState or Redux, and includes built-in state management for simpler use cases. The component integrates naturally with Material UI's theming system, allowing consistent design across applications. For custom backends, the library supports both client-side and server-side pagination, filtering, and sorting through simple configuration flags. TypeScript support is first-class with full generic type inference, enabling type-safe column definitions and state management throughout the application.
+TanStack Query DevTools provides a visual interface for inspecting and debugging query state during development.
+
+```tsx
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+
+const queryClient = new QueryClient()
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <MyApplication />
+      {/* DevTools - only included in development builds */}
+      <ReactQueryDevtools
+        initialIsOpen={false}
+        buttonPosition="bottom-right"
+      />
+    </QueryClientProvider>
+  )
+}
+
+// For production, you can lazy load devtools
+import { lazy, Suspense } from 'react'
+
+const ReactQueryDevtoolsProduction = lazy(() =>
+  import('@tanstack/react-query-devtools/build/modern/production.js').then(
+    (d) => ({ default: d.ReactQueryDevtools })
+  )
+)
+
+function App() {
+  const [showDevtools, setShowDevtools] = useState(false)
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <MyApplication />
+      <button onClick={() => setShowDevtools(true)}>Show Devtools</button>
+      {showDevtools && (
+        <Suspense fallback={null}>
+          <ReactQueryDevtoolsProduction />
+        </Suspense>
+      )}
+    </QueryClientProvider>
+  )
+}
+```
+
+---
+
+## Summary
+
+TanStack Query is essential for any application that needs to manage server state effectively. Its core use cases include fetching and caching API data with automatic background refetching, implementing optimistic updates for responsive UIs, handling pagination and infinite scrolling, prefetching data for instant page transitions, and synchronizing server state across multiple components without prop drilling. The library dramatically reduces boilerplate compared to manual state management while providing robust features like automatic garbage collection, request deduplication, and error retry logic out of the box.
+
+Integration patterns vary by framework but share the same conceptual model: wrap your application with a QueryClientProvider, use query hooks to fetch data declaratively, use mutation hooks for data modifications, and leverage the QueryClient for imperative cache operations. For optimal performance, define query options factories for reusable configurations, set appropriate staleTime and gcTime values, implement prefetching for predictable navigation patterns, and use the DevTools during development to understand caching behavior. The library works seamlessly with TypeScript, providing excellent type inference for query data and mutation variables.
