@@ -5,9 +5,9 @@ This document tracks the implementation progress of all CRUD operations for the 
 ## Overview
 
 - **Total Tasks**: 25
-- **Completed**: 18
+- **Completed**: 19
 - **In Progress**: 0
-- **Not Started**: 7
+- **Not Started**: 6
 
 ## 📊 Progress by Category
 
@@ -16,7 +16,7 @@ This document tracks the implementation progress of all CRUD operations for the 
 | MCP Tools      | 2     | 2         | 0           | 0           |
 | Library CRUD   | 6     | 4         | 0           | 2           |
 | Document CRUD  | 13    | 12        | 0           | 1           |
-| Infrastructure | 3     | 0         | 0           | 3           |
+| Infrastructure | 3     | 1         | 0           | 2           |
 | Testing        | 1     | 0         | 0           | 1           |
 
 ## 🎯 Recommended Implementation Order
@@ -504,28 +504,36 @@ This document tracks the implementation progress of all CRUD operations for the 
 
 ### Task #37: Add error handling and validation
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Completed
 **Priority**: High
-**Files**: `c7_mcp/exceptions.py`, `c7_mcp/api.py`
+**Files**: `c7_mcp/exceptions.py`, `c7_mcp/api.py`, `c7_mcp/db.py`, `c7_mcp/services/library.py`, `c7_mcp/services/document.py`, `c7_mcp/routers/libraries.py`, `c7_mcp/routers/documents.py`
 
 **Implementation Steps**:
 
-- [ ] Create custom exception classes (LibraryNotFound, DocumentNotFound, etc.)
-- [ ] Add global exception handlers in api.py
-- [ ] Standardize error response format
-- [ ] Add validation for all input fields
+- [x] Create custom exception classes (LibraryNotFound, DocumentNotFound, etc.)
+- [x] Add global exception handlers in api.py
+- [x] Standardize error response format
+- [x] Add validation for all input fields
 - [ ] Add rate limiting if needed
 - [ ] Add request/response logging
 - [ ] Add error tracking (Sentry or similar)
 
-**Exception Classes to Create**:
+**Exception Classes Created** (`c7_mcp/exceptions.py`):
 
-- `LibraryNotFoundError`
-- `LibraryNameConflictError`
-- `DocumentNotFoundError`
-- `EmbeddingsNotFoundError`
-- `URLFetchError`
-- `InvalidEmbeddingDimensionError`
+- `C7Error` (base)
+- `NotFoundError` → 404
+  - `LibraryNotFoundError`
+  - `DocumentNotFoundError`
+  - `EmbeddingsNotFoundError`
+- `ConflictError` → 409
+  - `LibraryExistsError`
+- `BadRequestError` → 400
+  - `EmbeddingDimensionError`
+  - `ConstraintError`
+  - `URLFetchError`
+- `DatabaseError` → 500
+
+**Design Decision**: Global FastAPI exception handlers map exception types to HTTP status codes. Routers let C7Error subclasses propagate (no string matching). Error response format: `{"error": "snake_case_slug", "message": "..."}`. Duplicate libraries now return 409 (was 400).
 
 ---
 
