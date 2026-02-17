@@ -230,14 +230,18 @@ async def get_document_pretty(doc_id: str) -> DocumentPretty:
         HTTPException: 404 if document not found.
         HTTPException: 501 if not implemented yet.
 
-    TODO: Implement formatted document retrieval endpoint.
-    TODO: 1. Call document_service.get_document()
-    TODO: 2. Return DocumentPretty with title and content
-    TODO: 3. Apply formatting (markdown, syntax highlighting, etc.)
-    TODO: 4. Handle not found errors (404)
-    TODO: 5. Handle other errors (500)
     """
-    raise HTTPException(status_code=501, detail="Not implemented")
+    try:
+        data = document_service.get_document(doc_id)
+        return DocumentPretty(title=data["title"], content=data["content"])
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get document: {str(e)}"
+        )
 
 
 @router.get("/{doc_id}/title", response_model=DocumentTitle)

@@ -143,14 +143,26 @@ async def update_library(
         HTTPException: 400 if new name already exists.
         HTTPException: 501 if not implemented yet.
 
-    TODO: Implement library full update endpoint.
-    TODO: 1. Call library_service.update_library()
-    TODO: 2. Transform LibraryData to LibraryResponse
-    TODO: 3. Handle not found errors (404)
-    TODO: 4. Handle duplicate name errors (400)
-    TODO: 5. Handle other errors (500)
     """
-    raise HTTPException(status_code=501, detail="Not implemented")
+    try:
+        data = library_service.update_library(
+            library_id=library_id,
+            name=library.name,
+            description=library.description or "",
+        )
+        return LibraryResponse(**data)
+
+    except ValueError as e:
+        error_msg = str(e)
+        if "not found" in error_msg.lower():
+            raise HTTPException(status_code=404, detail=error_msg)
+        else:
+            raise HTTPException(status_code=400, detail=error_msg)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update library: {str(e)}"
+        )
 
 
 @router.patch("/{library_id}", response_model=LibraryResponse)
@@ -171,14 +183,26 @@ async def partial_update_library(
         HTTPException: 400 if new name already exists.
         HTTPException: 501 if not implemented yet.
 
-    TODO: Implement library partial update endpoint.
-    TODO: 1. Call library_service.partial_update_library()
-    TODO: 2. Transform LibraryData to LibraryResponse
-    TODO: 3. Handle not found errors (404)
-    TODO: 4. Handle duplicate name errors (400)
-    TODO: 5. Handle other errors (500)
     """
-    raise HTTPException(status_code=501, detail="Not implemented")
+    try:
+        data = library_service.partial_update_library(
+            library_id=library_id,
+            name=library.name,
+            description=library.description,
+        )
+        return LibraryResponse(**data)
+
+    except ValueError as e:
+        error_msg = str(e)
+        if "not found" in error_msg.lower():
+            raise HTTPException(status_code=404, detail=error_msg)
+        else:
+            raise HTTPException(status_code=400, detail=error_msg)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update library: {str(e)}"
+        )
 
 
 @router.delete("/{library_id}", response_model=DeleteResponse)

@@ -275,6 +275,8 @@ def update_library(
 ) -> LibraryData:
     """Update library (full update).
 
+    Uses delete-then-re-add pattern since LanceDB has no UPDATE.
+
     Args:
         library_id: Library unique identifier.
         name: New library name.
@@ -284,36 +286,100 @@ def update_library(
         Updated library data.
 
     Raises:
-        ValueError: If library not found.
-
-    TODO: Implement library update logic.
-    TODO: 1. Verify library exists
-    TODO: 2. Validate name uniqueness (excluding current library)
-    TODO: 3. Update all fields
-    TODO: 4. Update updated_at timestamp
+        ValueError: If library not found or name conflicts.
     """
-    # Placeholder implementation
+    libraries = get_libraries_table()
     now = datetime.now()
-    return {
-        "id": library_id,
+
+    # 1. Verify library exists
+    existing = (
+        libraries.search()
+        .where(f"id = '{library_id}'", prefilter=True)
+        .limit(1)
+        .to_list()
+    )
+    if not existing:
+        raise ValueError(f"Library '{library_id}' not found")
+
+    lib = existing[0]
+
+    # 2. Validate name uniqueness (excluding current library)
+    if name != lib["name"]:
+        duplicates = (
+            libraries.search()
+            .where(
+                f"name = '{name}' AND ecosystem = '{lib['ecosystem']}'",
+                prefilter=True,
+            )
+            .limit(1)
+            .to_list()
+        )
+        if duplicates:
+            raise ValueError(
+                f"Library '{name}' already exists in ecosystem '{lib['ecosystem']}'"
+            )
+
+    # 3. Delete and re-add with updated fields
+    libraries.delete(f"id = '{library_id}'")
+
+    updated_data = {
+        "id": lib["id"],
         "name": name,
-        "context7_id": "/placeholder/library",
-        "language": "Unknown",
-        "ecosystem": "unknown",
+        "context7_id": lib["context7_id"],
+        "language": lib["language"],
+        "ecosystem": lib["ecosystem"],
         "description": description,
-        "short_description": "",
-        "aliases": [],
-        "keywords": [],
-        "category": "",
-        "homepage_url": "",
-        "repository_url": "",
-        "author": "",
-        "license": "",
-        "status": "active",
-        "popularity_score": 0,
-        "created_at": now,
+        "short_description": lib["short_description"],
+        "aliases": lib["aliases"],
+        "keywords": lib["keywords"],
+        "category": lib["category"],
+        "homepage_url": lib["homepage_url"],
+        "repository_url": lib["repository_url"],
+        "logo_url": lib.get("logo_url", ""),
+        "author": lib["author"],
+        "license": lib["license"],
+        "status": lib["status"],
+        "popularity_score": lib["popularity_score"],
+        "github_stars": lib.get("github_stars", 0),
+        "npm_downloads_weekly": lib.get("npm_downloads_weekly", 0),
+        "pypi_downloads_monthly": lib.get("pypi_downloads_monthly", 0),
+        "doc_version": lib.get("doc_version", ""),
+        "doc_source_type": lib.get("doc_source_type", ""),
+        "doc_completeness": lib.get("doc_completeness", 0.0),
+        "last_indexed_at": lib.get("last_indexed_at"),
+        "related_libraries": lib.get("related_libraries", []),
+        "alternative_to": lib.get("alternative_to", []),
+        "supersedes": lib.get("supersedes", []),
+        "requires_libraries": lib.get("requires_libraries", []),
+        "first_release_date": lib.get("first_release_date"),
+        "last_release_date": lib.get("last_release_date"),
+        "created_at": lib["created_at"],
         "updated_at": now,
-        "document_count": 0,
+        "document_count": lib["document_count"],
+    }
+
+    libraries.add([updated_data])
+
+    return {
+        "id": lib["id"],
+        "name": name,
+        "context7_id": lib["context7_id"],
+        "language": lib["language"],
+        "ecosystem": lib["ecosystem"],
+        "description": description,
+        "short_description": lib["short_description"],
+        "aliases": lib["aliases"],
+        "keywords": lib["keywords"],
+        "category": lib["category"],
+        "homepage_url": lib["homepage_url"],
+        "repository_url": lib["repository_url"],
+        "author": lib["author"],
+        "license": lib["license"],
+        "status": lib["status"],
+        "popularity_score": lib["popularity_score"],
+        "created_at": lib["created_at"],
+        "updated_at": now,
+        "document_count": lib["document_count"],
     }
 
 
@@ -321,6 +387,9 @@ def partial_update_library(
     library_id: str, name: str | None = None, description: str | None = None
 ) -> LibraryData:
     """Update library (partial update).
+
+    Uses delete-then-re-add pattern since LanceDB has no UPDATE.
+    Only updates fields that are explicitly provided.
 
     Args:
         library_id: Library unique identifier.
@@ -331,36 +400,104 @@ def partial_update_library(
         Updated library data.
 
     Raises:
-        ValueError: If library not found.
-
-    TODO: Implement library partial update logic.
-    TODO: 1. Verify library exists
-    TODO: 2. Update only provided fields
-    TODO: 3. Validate name uniqueness if name provided
-    TODO: 4. Update updated_at timestamp
+        ValueError: If library not found or name conflicts.
     """
-    # Placeholder implementation
+    libraries = get_libraries_table()
     now = datetime.now()
-    return {
-        "id": library_id,
-        "name": name or "Placeholder Library",
-        "context7_id": "/placeholder/library",
-        "language": "Unknown",
-        "ecosystem": "unknown",
-        "description": description or "",
-        "short_description": "",
-        "aliases": [],
-        "keywords": [],
-        "category": "",
-        "homepage_url": "",
-        "repository_url": "",
-        "author": "",
-        "license": "",
-        "status": "active",
-        "popularity_score": 0,
-        "created_at": now,
+
+    # 1. Verify library exists
+    existing = (
+        libraries.search()
+        .where(f"id = '{library_id}'", prefilter=True)
+        .limit(1)
+        .to_list()
+    )
+    if not existing:
+        raise ValueError(f"Library '{library_id}' not found")
+
+    lib = existing[0]
+
+    # 2. Determine new values (use existing if not provided)
+    new_name = name if name is not None else lib["name"]
+    new_description = description if description is not None else lib["description"]
+
+    # 3. Validate name uniqueness if name changed
+    if name is not None and name != lib["name"]:
+        duplicates = (
+            libraries.search()
+            .where(
+                f"name = '{name}' AND ecosystem = '{lib['ecosystem']}'",
+                prefilter=True,
+            )
+            .limit(1)
+            .to_list()
+        )
+        if duplicates:
+            raise ValueError(
+                f"Library '{name}' already exists in ecosystem '{lib['ecosystem']}'"
+            )
+
+    # 4. Delete and re-add with updated fields
+    libraries.delete(f"id = '{library_id}'")
+
+    updated_data = {
+        "id": lib["id"],
+        "name": new_name,
+        "context7_id": lib["context7_id"],
+        "language": lib["language"],
+        "ecosystem": lib["ecosystem"],
+        "description": new_description,
+        "short_description": lib["short_description"],
+        "aliases": lib["aliases"],
+        "keywords": lib["keywords"],
+        "category": lib["category"],
+        "homepage_url": lib["homepage_url"],
+        "repository_url": lib["repository_url"],
+        "logo_url": lib.get("logo_url", ""),
+        "author": lib["author"],
+        "license": lib["license"],
+        "status": lib["status"],
+        "popularity_score": lib["popularity_score"],
+        "github_stars": lib.get("github_stars", 0),
+        "npm_downloads_weekly": lib.get("npm_downloads_weekly", 0),
+        "pypi_downloads_monthly": lib.get("pypi_downloads_monthly", 0),
+        "doc_version": lib.get("doc_version", ""),
+        "doc_source_type": lib.get("doc_source_type", ""),
+        "doc_completeness": lib.get("doc_completeness", 0.0),
+        "last_indexed_at": lib.get("last_indexed_at"),
+        "related_libraries": lib.get("related_libraries", []),
+        "alternative_to": lib.get("alternative_to", []),
+        "supersedes": lib.get("supersedes", []),
+        "requires_libraries": lib.get("requires_libraries", []),
+        "first_release_date": lib.get("first_release_date"),
+        "last_release_date": lib.get("last_release_date"),
+        "created_at": lib["created_at"],
         "updated_at": now,
-        "document_count": 0,
+        "document_count": lib["document_count"],
+    }
+
+    libraries.add([updated_data])
+
+    return {
+        "id": lib["id"],
+        "name": new_name,
+        "context7_id": lib["context7_id"],
+        "language": lib["language"],
+        "ecosystem": lib["ecosystem"],
+        "description": new_description,
+        "short_description": lib["short_description"],
+        "aliases": lib["aliases"],
+        "keywords": lib["keywords"],
+        "category": lib["category"],
+        "homepage_url": lib["homepage_url"],
+        "repository_url": lib["repository_url"],
+        "author": lib["author"],
+        "license": lib["license"],
+        "status": lib["status"],
+        "popularity_score": lib["popularity_score"],
+        "created_at": lib["created_at"],
+        "updated_at": now,
+        "document_count": lib["document_count"],
     }
 
 
