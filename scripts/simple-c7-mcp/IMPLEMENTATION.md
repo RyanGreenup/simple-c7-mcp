@@ -5,17 +5,17 @@ This document tracks the implementation progress of all CRUD operations for the 
 ## Overview
 
 - **Total Tasks**: 25
-- **Completed**: 5
+- **Completed**: 8
 - **In Progress**: 0
-- **Not Started**: 20
+- **Not Started**: 17
 
 ## 📊 Progress by Category
 
 | Category       | Total | Completed | In Progress | Not Started |
 | -------------- | ----- | --------- | ----------- | ----------- |
 | MCP Tools      | 2     | 2         | 0           | 0           |
-| Library CRUD   | 6     | 1         | 0           | 5           |
-| Document CRUD  | 13    | 2         | 0           | 11          |
+| Library CRUD   | 6     | 2         | 0           | 4           |
+| Document CRUD  | 13    | 4         | 0           | 9           |
 | Infrastructure | 3     | 0         | 0           | 3           |
 | Testing        | 1     | 0         | 0           | 1           |
 
@@ -168,21 +168,23 @@ This document tracks the implementation progress of all CRUD operations for the 
 
 ### Task #21: Implement library delete endpoint
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Completed
 **Priority**: Medium
 **Files**: `c7_mcp/services/library.py`, `c7_mcp/routers/libraries.py`
 **Endpoint**: `DELETE /api/v1/libraries/{library_id}`
 
 **Implementation Steps**:
 
-- [ ] Verify library exists in database
-- [ ] Decide on handling documents (cascade delete or prevent if has documents)
-- [ ] Delete library from database
-- [ ] Clean up associated resources
-- [ ] Return DeleteResponse with success=True
-- [ ] Handle not found errors with 404 status
-- [ ] Handle libraries with documents with 400 status (if preventing deletion)
-- [ ] Handle other errors with 500 status
+- [x] Verify library exists in database
+- [x] Decide on handling documents (cascade delete or prevent if has documents)
+- [x] Delete library from database
+- [x] Clean up associated resources
+- [x] Return DeleteResponse with success=True
+- [x] Handle not found errors with 404 status
+- [x] Handle libraries with documents with 400 status (if preventing deletion)
+- [x] Handle other errors with 500 status
+
+**Design Decision**: Prevents deletion if library has associated documents (returns 400). Documents must be deleted first.
 
 ---
 
@@ -229,24 +231,26 @@ This document tracks the implementation progress of all CRUD operations for the 
 
 ### Task #24: Implement document fetch from URL endpoint
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Completed
 **Priority**: High
 **Files**: `c7_mcp/services/document.py`, `c7_mcp/routers/documents.py`
 **Endpoint**: `POST /api/v1/documents/fetch`
 
 **Implementation Steps**:
 
-- [ ] Verify library exists in database
-- [ ] Fetch content from URL (handle timeouts, HTTP errors)
-- [ ] Parse content (handle different formats: HTML, PDF, Markdown, etc.)
-- [ ] Extract text content from parsed documents
-- [ ] Generate unique ID for document
-- [ ] Store parsed content and metadata
+- [x] Verify library exists in database
+- [x] Fetch content from URL (handle timeouts, HTTP errors)
+- [x] Parse content (handle different formats: HTML, PDF, Markdown, etc.)
+- [x] Extract text content from parsed documents
+- [x] Generate unique ID for document
+- [x] Store parsed content and metadata
 - [ ] Update library document count
-- [ ] Transform DocumentData to DocumentResponse in router
-- [ ] Handle library not found errors with 404 status
-- [ ] Handle URL fetch errors with 400 status
-- [ ] Handle other errors with 500 status
+- [x] Transform DocumentData to DocumentResponse in router
+- [x] Handle library not found errors with 404 status
+- [x] Handle URL fetch errors with 400 status
+- [x] Handle other errors with 500 status
+
+**Design Decision**: Uses `urllib.request` (stdlib) with 30s timeout. Detects source_type from Content-Type header and URL extension. Sets `source` to the URL.
 
 ---
 
@@ -360,20 +364,22 @@ This document tracks the implementation progress of all CRUD operations for the 
 
 ### Task #31: Implement document update content endpoint
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Completed
 **Priority**: High
 **Files**: `c7_mcp/services/document.py`, `c7_mcp/routers/documents.py`
 **Endpoint**: `PATCH /api/v1/documents/{doc_id}/content`
 
 **Implementation Steps**:
 
-- [ ] Verify document exists in database
-- [ ] Update content field
-- [ ] Invalidate embeddings (set has_embeddings to False)
-- [ ] Update updated_at timestamp
-- [ ] Transform DocumentData to DocumentResponse in router
-- [ ] Handle not found errors with 404 status
-- [ ] Handle other errors with 500 status
+- [x] Verify document exists in database
+- [x] Update content field
+- [x] Invalidate embeddings (set has_embeddings to False)
+- [x] Update updated_at timestamp
+- [x] Transform DocumentData to DocumentResponse in router
+- [x] Handle not found errors with 404 status
+- [x] Handle other errors with 500 status
+
+**Design Decision**: Uses delete-then-re-add pattern (LanceDB has no UPDATE). Preserves original `created_at` and all metadata from first chunk.
 
 ---
 
@@ -598,19 +604,19 @@ everything before them unblocks the path to get there.
 - [x] `1.` `GET    /{id}`              — get library by ID
 - [ ] `9.` `PUT    /{id}`              — full update
 - [ ] `10.` `PATCH  /{id}`             — partial update
-- [ ] `8.` `DELETE /{id}`              — delete library
+- [x] `8.` `DELETE /{id}`              — delete library
 
 ### Documents (`/api/v1/documents`)
 - [x]     `GET    /`                  — list documents (filter by library_id)
 - [x]     `POST   /`                  — create document (upload content)
-- [ ] `6.` `POST   /fetch`             — create document (fetch from URL)
+- [x] `6.` `POST   /fetch`             — create document (fetch from URL)
 - [x] `2.` `GET    /{id}`              — get document metadata
 - [x] `3.` `GET    /{id}/content`      — get raw content
 - [ ] `11.` `GET   /{id}/pretty`       — get title + content
 - [ ] `13.` `GET   /{id}/title`        — get title only
 - [ ] `12.` `GET   /{id}/embeddings`   — get embedding vector
 - [ ] `14.` `PUT   /{id}`              — full update
-- [ ] `7.` `PATCH  /{id}/content`      — update content
+- [x] `7.` `PATCH  /{id}/content`      — update content
 - [ ] `15.` `PATCH /{id}/title`        — update title
 - [ ] `16.` `PATCH /{id}/library`      — move to different library
 - [ ] `17.` `PATCH /{id}/embeddings`   — update embeddings

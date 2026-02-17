@@ -191,22 +191,79 @@ def fetch_document(title: str, url: str, library_id: str) -> DocumentData:
 
     Raises:
         ValueError: If library not found or URL fetch fails.
-
-    TODO: Implement document fetch logic.
-    TODO: 1. Verify library exists
-    TODO: 2. Fetch content from URL (handle timeouts, errors)
-    TODO: 3. Parse content (handle different formats: HTML, PDF, etc.)
-    TODO: 4. Generate unique ID
-    TODO: 5. Store parsed content
-    TODO: 6. Update library document count
     """
-    # Placeholder implementation
+    import json
+    import urllib.request
+    import uuid
+
+    from c7_mcp.db import get_documents_table, get_libraries_table
+
+    libraries = get_libraries_table()
+    documents = get_documents_table()
     now = datetime.now()
+
+    # 1. Verify library exists
+    existing_lib = (
+        libraries.search()
+        .where(f"id = '{library_id}'", prefilter=True)
+        .limit(1)
+        .to_list()
+    )
+    if not existing_lib:
+        raise ValueError(f"Library with ID '{library_id}' not found")
+
+    library = existing_lib[0]
+
+    # 2. Fetch content from URL
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "c7-mcp/1.0"})
+        with urllib.request.urlopen(req, timeout=30) as response:
+            content = response.read().decode("utf-8", errors="replace")
+            content_type = response.headers.get("Content-Type", "")
+    except Exception as e:
+        raise ValueError(f"Failed to fetch URL '{url}': {e}")
+
+    # 3. Determine source_type from Content-Type or URL extension
+    if "html" in content_type:
+        source_type = "html"
+    elif "json" in content_type:
+        source_type = "json"
+    elif url.endswith(".md"):
+        source_type = "markdown"
+    elif url.endswith(".rst"):
+        source_type = "rst"
+    else:
+        source_type = "text"
+
+    # 4. Generate unique document ID and store
+    document_id = f"doc-{uuid.uuid4()}"
+    zero_vector = [0.0] * 2560
+
+    document_data = {
+        "id": hash(document_id) & 0x7FFFFFFF,
+        "document_id": document_id,
+        "library_id": library_id,
+        "title": title,
+        "text": content,
+        "chunk_index": 0,
+        "chunk_total": 1,
+        "source": url,
+        "source_type": source_type,
+        "vector": zero_vector,
+        "metadata_json": json.dumps({"has_real_embeddings": False}),
+        "created_at": now,
+        "library_name": library["name"],
+        "library_language": library["language"],
+        "library_ecosystem": library["ecosystem"],
+    }
+
+    documents.add([document_data])
+
     return {
-        "id": "doc-placeholder",
+        "id": document_id,
         "title": title,
         "library_id": library_id,
-        "content": f"Content fetched from {url}",
+        "content": content,
         "created_at": now,
         "updated_at": now,
         "has_embeddings": False,
@@ -295,6 +352,8 @@ def get_embeddings(doc_id: str) -> EmbeddingData:
 def update_content(doc_id: str, content: str) -> DocumentData:
     """Update document content.
 
+    Uses delete-then-re-add pattern since LanceDB has no UPDATE.
+
     Args:
         doc_id: Document unique identifier.
         content: New document content.
@@ -304,21 +363,59 @@ def update_content(doc_id: str, content: str) -> DocumentData:
 
     Raises:
         ValueError: If document not found.
-
-    TODO: Implement content update logic.
-    TODO: 1. Verify document exists
-    TODO: 2. Update content field
-    TODO: 3. Invalidate embeddings (set has_embeddings to False)
-    TODO: 4. Update updated_at timestamp
     """
-    # Placeholder implementation
+    import json
+
+    from c7_mcp.db import get_documents_table
+
+    documents = get_documents_table()
     now = datetime.now()
+
+    # 1. Query all chunks for this document
+    results = (
+        documents.search()
+        .where(f"document_id = '{doc_id}'", prefilter=True)
+        .limit(1000)
+        .to_list()
+    )
+    if not results:
+        raise ValueError(f"Document '{doc_id}' not found")
+
+    # 2. Preserve metadata from first chunk
+    first_chunk = results[0]
+    original_created_at = first_chunk["created_at"]
+
+    # 3. Delete all existing chunks
+    documents.delete(f"document_id = '{doc_id}'")
+
+    # 4. Re-add single chunk with new content
+    zero_vector = [0.0] * 2560
+    document_data = {
+        "id": hash(doc_id) & 0x7FFFFFFF,
+        "document_id": doc_id,
+        "library_id": first_chunk["library_id"],
+        "title": first_chunk["title"],
+        "text": content,
+        "chunk_index": 0,
+        "chunk_total": 1,
+        "source": first_chunk["source"],
+        "source_type": first_chunk["source_type"],
+        "vector": zero_vector,
+        "metadata_json": json.dumps({"has_real_embeddings": False}),
+        "created_at": original_created_at,
+        "library_name": first_chunk["library_name"],
+        "library_language": first_chunk["library_language"],
+        "library_ecosystem": first_chunk["library_ecosystem"],
+    }
+
+    documents.add([document_data])
+
     return {
         "id": doc_id,
-        "title": "Placeholder Document",
-        "library_id": "lib-placeholder",
+        "title": first_chunk["title"],
+        "library_id": first_chunk["library_id"],
         "content": content,
-        "created_at": now,
+        "created_at": original_created_at,
         "updated_at": now,
         "has_embeddings": False,
     }

@@ -16,6 +16,10 @@ format:
 test:
     uv run pytest -v .
 
+# Run integration tests against a live server (requires: just serve)
+test-integration port="8000":
+    uv run python tests/test_integration.py --base-url http://localhost:{{ port }}
+
 # Start the FastAPI server
 serve port="8000":
     uv run c7-mcp serve --port {{ port }} --reload
@@ -501,6 +505,9 @@ fetch-react port="8000":
 
 fetch-vue port="8000":
     just fetch-doc "vue" "Vue 3 Composition API and reactive state management" {{ port }}
+
+fetch-vue-router port="8000":
+    just fetch-doc "vue-router" "How to define and configure API routes in Vue Router" {{ port }}
 
 fetch-daisyui port="8000":
     just fetch-doc "daisyui" "How to use button and card components in DaisyUI" {{ port }}

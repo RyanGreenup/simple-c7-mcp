@@ -196,11 +196,21 @@ async def delete_library(library_id: str) -> DeleteResponse:
         HTTPException: 400 if library has documents (decide on cascade behavior).
         HTTPException: 501 if not implemented yet.
 
-    TODO: Implement library deletion endpoint.
-    TODO: 1. Call library_service.delete_library()
-    TODO: 2. Return DeleteResponse with success=True
-    TODO: 3. Handle not found errors (404)
-    TODO: 4. Handle libraries with documents (400 or cascade delete)
-    TODO: 5. Handle other errors (500)
     """
-    raise HTTPException(status_code=501, detail="Not implemented")
+    try:
+        library_service.delete_library(library_id)
+        return DeleteResponse(
+            success=True, message=f"Library '{library_id}' deleted successfully"
+        )
+
+    except ValueError as e:
+        error_msg = str(e)
+        if "not found" in error_msg.lower():
+            raise HTTPException(status_code=404, detail=error_msg)
+        else:
+            raise HTTPException(status_code=400, detail=error_msg)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete library: {str(e)}"
+        )

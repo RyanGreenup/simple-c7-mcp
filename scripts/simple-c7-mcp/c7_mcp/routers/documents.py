@@ -133,14 +133,34 @@ async def fetch_document(document: DocumentFetch) -> DocumentResponse:
         HTTPException: 400 if URL fetch fails.
         HTTPException: 501 if not implemented yet.
 
-    TODO: Implement document fetch endpoint.
-    TODO: 1. Call document_service.fetch_document()
-    TODO: 2. Transform DocumentData to DocumentResponse
-    TODO: 3. Handle library not found errors (404)
-    TODO: 4. Handle URL fetch errors (400)
-    TODO: 5. Handle other errors (500)
     """
-    raise HTTPException(status_code=501, detail="Not implemented")
+    try:
+        data = document_service.fetch_document(
+            title=document.title,
+            url=str(document.url),
+            library_id=document.library_id,
+        )
+
+        return DocumentResponse(
+            id=data["id"],
+            title=data["title"],
+            library_id=data["library_id"],
+            created_at=data["created_at"],
+            updated_at=data["updated_at"],
+            has_embeddings=data["has_embeddings"],
+        )
+
+    except ValueError as e:
+        error_msg = str(e)
+        if "not found" in error_msg.lower():
+            raise HTTPException(status_code=404, detail=error_msg)
+        else:
+            raise HTTPException(status_code=400, detail=error_msg)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch document: {str(e)}"
+        )
 
 
 @router.get("/{doc_id}", response_model=DocumentResponse)
@@ -310,14 +330,26 @@ async def update_document_content(
         HTTPException: 404 if document not found.
         HTTPException: 501 if not implemented yet.
 
-    TODO: Implement content update endpoint.
-    TODO: 1. Call document_service.update_content()
-    TODO: 2. Transform DocumentData to DocumentResponse
-    TODO: 3. Invalidate embeddings (set has_embeddings to False)
-    TODO: 4. Handle not found errors (404)
-    TODO: 5. Handle other errors (500)
     """
-    raise HTTPException(status_code=501, detail="Not implemented")
+    try:
+        data = document_service.update_content(doc_id, content_update.content)
+
+        return DocumentResponse(
+            id=data["id"],
+            title=data["title"],
+            library_id=data["library_id"],
+            created_at=data["created_at"],
+            updated_at=data["updated_at"],
+            has_embeddings=data["has_embeddings"],
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update content: {str(e)}"
+        )
 
 
 @router.patch("/{doc_id}/title", response_model=DocumentResponse)

@@ -367,6 +367,8 @@ def partial_update_library(
 def delete_library(library_id: str) -> bool:
     """Delete a library.
 
+    Prevents deletion if library has associated documents.
+
     Args:
         library_id: Library unique identifier.
 
@@ -374,13 +376,37 @@ def delete_library(library_id: str) -> bool:
         True if deletion was successful.
 
     Raises:
-        ValueError: If library not found.
-
-    TODO: Implement library deletion logic.
-    TODO: 1. Verify library exists
-    TODO: 2. Decide on handling documents (cascade delete or prevent)
-    TODO: 3. Delete library from database
-    TODO: 4. Clean up associated resources
+        ValueError: If library not found or has associated documents.
     """
-    # Placeholder implementation
+    from c7_mcp.db import get_documents_table
+
+    libraries = get_libraries_table()
+
+    # 1. Verify library exists
+    existing = (
+        libraries.search()
+        .where(f"id = '{library_id}'", prefilter=True)
+        .limit(1)
+        .to_list()
+    )
+    if not existing:
+        raise ValueError(f"Library '{library_id}' not found")
+
+    # 2. Check for associated documents
+    documents = get_documents_table()
+    doc_results = (
+        documents.search()
+        .where(f"library_id = '{library_id}'", prefilter=True)
+        .limit(1)
+        .to_list()
+    )
+    if doc_results:
+        raise ValueError(
+            f"Library '{library_id}' has associated documents. "
+            "Delete all documents first."
+        )
+
+    # 3. Delete library
+    libraries.delete(f"id = '{library_id}'")
+
     return True
