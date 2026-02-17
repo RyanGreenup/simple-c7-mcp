@@ -77,9 +77,106 @@ create-library name language ecosystem description="" port="8000":
 list-libraries port="8000":
     curl -s http://127.0.0.1:{{ port }}/api/v1/libraries | python -m json.tool
 
+# Get a library by ID
+get-library library_id port="8000":
+    curl -s http://127.0.0.1:{{ port }}/api/v1/libraries/{{ library_id }} | python -m json.tool
+
 # ============================================================================
 # Document Management
 # ============================================================================
+
+# Get a document by ID (metadata only)
+get-document doc_id port="8000":
+    curl -s http://127.0.0.1:{{ port }}/api/v1/documents/{{ doc_id }} | python -m json.tool
+
+# Get raw document content by ID
+get-content doc_id port="8000":
+    curl -s http://127.0.0.1:{{ port }}/api/v1/documents/{{ doc_id }}/content | python -m json.tool
+
+# Test items 1-3: get-library, get-document, get-document-content
+test-retrieval library_id doc_id port="8000":
+    #!/usr/bin/env bash
+    BASE="http://127.0.0.1:{{ port }}"
+    echo "=== GET /api/v1/libraries/{{ library_id }} ==="
+    curl -sf "$BASE/api/v1/libraries/{{ library_id }}" | jq .
+    echo ""
+    echo "=== GET /api/v1/documents/{{ doc_id }} ==="
+    curl -sf "$BASE/api/v1/documents/{{ doc_id }}" | jq .
+    echo ""
+    echo "=== GET /api/v1/documents/{{ doc_id }}/content ==="
+    curl -sf "$BASE/api/v1/documents/{{ doc_id }}/content" | jq .
+
+# MCP: Resolve a library name to a Context7 ID
+mcp-resolve library_name query="" port="8000":
+    #!/usr/bin/env python3
+    import json
+    import urllib.request
+    import sys
+
+    url = "http://127.0.0.1:{{ port }}/mcp"
+    data = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": "resolve-library-id",
+            "arguments": {
+                "libraryName": "{{ library_name }}",
+                "query": "{{ query }}"
+            }
+        }
+    }
+
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(data).encode('utf-8'),
+        headers={'Content-Type': 'application/json'}
+    )
+
+    try:
+        with urllib.request.urlopen(req) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            print(result['result']['content'][0]['text'])
+    except urllib.error.HTTPError as e:
+        error = json.loads(e.read().decode('utf-8'))
+        print(f"Error {e.code}: {error['detail']}")
+        sys.exit(1)
+
+# MCP: Query docs for a library (use context7_id from mcp-resolve)
+mcp-query library_id query port="8000":
+    #!/usr/bin/env python3
+    import json
+    import urllib.request
+    import sys
+
+    url = "http://127.0.0.1:{{ port }}/mcp"
+    data = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": "query-docs",
+            "arguments": {
+                "libraryId": "{{ library_id }}",
+                "query": "{{ query }}"
+            }
+        }
+    }
+
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(data).encode('utf-8'),
+        headers={'Content-Type': 'application/json'}
+    )
+
+    try:
+        with urllib.request.urlopen(req) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            print(result['result']['content'][0]['text'])
+    except urllib.error.HTTPError as e:
+        error = json.loads(e.read().decode('utf-8'))
+        print(f"Error {e.code}: {error['detail']}")
+        sys.exit(1)
 
 # Upload a document from a file
 upload-doc file library_id title="" port="8000":

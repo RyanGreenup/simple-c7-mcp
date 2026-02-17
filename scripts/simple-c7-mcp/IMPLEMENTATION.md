@@ -5,17 +5,17 @@ This document tracks the implementation progress of all CRUD operations for the 
 ## Overview
 
 - **Total Tasks**: 25
-- **Completed**: 0
+- **Completed**: 5
 - **In Progress**: 0
-- **Not Started**: 25
+- **Not Started**: 20
 
 ## 📊 Progress by Category
 
 | Category       | Total | Completed | In Progress | Not Started |
 | -------------- | ----- | --------- | ----------- | ----------- |
-| MCP Tools      | 2     | 0         | 0           | 2           |
-| Library CRUD   | 6     | 0         | 0           | 6           |
-| Document CRUD  | 13    | 0         | 0           | 13          |
+| MCP Tools      | 2     | 2         | 0           | 0           |
+| Library CRUD   | 6     | 1         | 0           | 5           |
+| Document CRUD  | 13    | 2         | 0           | 11          |
 | Infrastructure | 3     | 0         | 0           | 3           |
 | Testing        | 1     | 0         | 0           | 1           |
 
@@ -34,38 +34,38 @@ This document tracks the implementation progress of all CRUD operations for the 
 
 ### Task #14: Implement MCP resolve-library-id tool
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Completed
 **Priority**: Medium
 **Files**: `c7_mcp/services/mcp.py`, `c7_mcp/routers/mcp.py`
 
 **Implementation Steps**:
 
-- [ ] Parse ResolveLibraryIdArgs from request.params.arguments
-- [ ] Query library database for matching names
-- [ ] Use query context to disambiguate if multiple matches
-- [ ] Return standardized library ID format (e.g., /npm/react)
-- [ ] Handle library not found cases with appropriate error messages
+- [x] Parse ResolveLibraryIdArgs from request.params.arguments
+- [x] Query library database for matching names
+- [x] Use query context to disambiguate if multiple matches
+- [x] Return standardized library ID format (e.g., /npm/react)
+- [x] Handle library not found cases with appropriate error messages
 - [ ] Add logging for tool invocations
-- [ ] Update router to call service function and wrap result in TextContent
+- [x] Update router to call service function and wrap result in TextContent
 
 ---
 
 ### Task #15: Implement MCP query-docs tool
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Completed
 **Priority**: Medium
 **Files**: `c7_mcp/services/mcp.py`, `c7_mcp/routers/mcp.py`
 
 **Implementation Steps**:
 
-- [ ] Parse QueryDocsArgs from request.params.arguments
-- [ ] Validate library_id exists in database
-- [ ] Retrieve and search documentation content
-- [ ] Use semantic search or vector embeddings for relevance
-- [ ] Format response with relevant code examples
-- [ ] Handle library not found or no results cases
+- [x] Parse QueryDocsArgs from request.params.arguments
+- [x] Validate library_id exists in database
+- [x] Retrieve and search documentation content
+- [x] Use semantic search or vector embeddings for relevance
+- [x] Format response with relevant code examples
+- [x] Handle library not found or no results cases
 - [ ] Add logging for tool invocations
-- [ ] Update router to call service function and wrap result in TextContent
+- [x] Update router to call service function and wrap result in TextContent
 
 ---
 
@@ -110,19 +110,19 @@ This document tracks the implementation progress of all CRUD operations for the 
 
 ### Task #18: Implement library get endpoint
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Completed
 **Priority**: High
 **Files**: `c7_mcp/services/library.py`, `c7_mcp/routers/libraries.py`
 **Endpoint**: `GET /api/v1/libraries/{library_id}`
 
 **Implementation Steps**:
 
-- [ ] Query database by library ID
-- [ ] Count associated documents
-- [ ] Raise ValueError if library not found
-- [ ] Transform LibraryData to LibraryResponse in router
-- [ ] Handle not found errors with 404 status
-- [ ] Handle other errors with 500 status
+- [x] Query database by library ID
+- [x] Count associated documents
+- [x] Raise ValueError if library not found
+- [x] Transform LibraryData to LibraryResponse in router
+- [x] Handle not found errors with 404 status
+- [x] Handle other errors with 500 status
 
 ---
 
@@ -252,37 +252,37 @@ This document tracks the implementation progress of all CRUD operations for the 
 
 ### Task #25: Implement document get metadata endpoint
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Completed
 **Priority**: High
 **Files**: `c7_mcp/services/document.py`, `c7_mcp/routers/documents.py`
 **Endpoint**: `GET /api/v1/documents/{doc_id}`
 
 **Implementation Steps**:
 
-- [ ] Query database by document ID
-- [ ] Include all metadata fields
-- [ ] Raise ValueError if document not found
-- [ ] Transform DocumentData to DocumentResponse (exclude content) in router
-- [ ] Handle not found errors with 404 status
-- [ ] Handle other errors with 500 status
+- [x] Query database by document ID
+- [x] Include all metadata fields
+- [x] Raise ValueError if document not found
+- [x] Transform DocumentData to DocumentResponse (exclude content) in router
+- [x] Handle not found errors with 404 status
+- [x] Handle other errors with 500 status
 
 ---
 
 ### Task #26: Implement document get content endpoint
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Completed
 **Priority**: High
 **Files**: `c7_mcp/services/document.py`, `c7_mcp/routers/documents.py`
 **Endpoint**: `GET /api/v1/documents/{doc_id}/content`
 
 **Implementation Steps**:
 
-- [ ] Query database by document ID
-- [ ] Return only content field
-- [ ] Raise ValueError if document not found
-- [ ] Return DocumentContent with raw text in router
-- [ ] Handle not found errors with 404 status
-- [ ] Handle other errors with 500 status
+- [x] Query database by document ID
+- [x] Return only content field
+- [x] Raise ValueError if document not found
+- [x] Return DocumentContent with raw text in router
+- [x] Handle not found errors with 404 status
+- [x] Handle other errors with 500 status
 
 ---
 
@@ -582,8 +582,8 @@ When all tasks are complete:
 
 ---
 
-**Last Updated**: 2026-02-16
-**Document Version**: 1.0
+**Last Updated**: 2026-02-17
+**Document Version**: 1.1
 
 ---
 
@@ -595,7 +595,7 @@ everything before them unblocks the path to get there.
 ### Libraries (`/api/v1/libraries`)
 - [x]     `GET    /`                  — list all libraries
 - [x]     `POST   /`                  — create library
-- [ ] `1.` `GET    /{id}`              — get library by ID
+- [x] `1.` `GET    /{id}`              — get library by ID
 - [ ] `9.` `PUT    /{id}`              — full update
 - [ ] `10.` `PATCH  /{id}`             — partial update
 - [ ] `8.` `DELETE /{id}`              — delete library
@@ -604,8 +604,8 @@ everything before them unblocks the path to get there.
 - [x]     `GET    /`                  — list documents (filter by library_id)
 - [x]     `POST   /`                  — create document (upload content)
 - [ ] `6.` `POST   /fetch`             — create document (fetch from URL)
-- [ ] `2.` `GET    /{id}`              — get document metadata
-- [ ] `3.` `GET    /{id}/content`      — get raw content
+- [x] `2.` `GET    /{id}`              — get document metadata
+- [x] `3.` `GET    /{id}/content`      — get raw content
 - [ ] `11.` `GET   /{id}/pretty`       — get title + content
 - [ ] `13.` `GET   /{id}/title`        — get title only
 - [ ] `12.` `GET   /{id}/embeddings`   — get embedding vector
@@ -617,8 +617,8 @@ everything before them unblocks the path to get there.
 - [ ] `18.` `DELETE /{id}`             — delete document
 
 ### MCP Tools (`POST /mcp`)
-- [ ] `4.` `resolve-library-id` — resolve library name → Context7 ID
-- [ ] `5.` `query-docs` — query stored docs by library ID + query string
+- [x] `4.` `resolve-library-id` — resolve library name → Context7 ID
+- [x] `5.` `query-docs` — query stored docs by library ID + query string
 
 
 

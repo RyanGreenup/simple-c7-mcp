@@ -236,34 +236,37 @@ def get_library(library_id: str) -> LibraryData:
 
     Raises:
         ValueError: If library not found.
-
-    TODO: Implement library retrieval logic.
-    TODO: 1. Query database by ID
-    TODO: 2. Count associated documents
-    TODO: 3. Raise ValueError if not found
     """
-    # Placeholder implementation
-    now = datetime.now()
+    libraries = get_libraries_table()
+    results = (
+        libraries.search()
+        .where(f"id = '{library_id}'", prefilter=True)
+        .limit(1)
+        .to_list()
+    )
+    if not results:
+        raise ValueError(f"Library '{library_id}' not found")
+    lib = results[0]
     return {
-        "id": library_id,
-        "name": "Placeholder Library",
-        "context7_id": "/placeholder/library",
-        "language": "Unknown",
-        "ecosystem": "unknown",
-        "description": "",
-        "short_description": "",
-        "aliases": [],
-        "keywords": [],
-        "category": "",
-        "homepage_url": "",
-        "repository_url": "",
-        "author": "",
-        "license": "",
-        "status": "active",
-        "popularity_score": 0,
-        "created_at": now,
-        "updated_at": now,
-        "document_count": 0,
+        "id": lib["id"],
+        "name": lib["name"],
+        "context7_id": lib["context7_id"],
+        "language": lib["language"],
+        "ecosystem": lib["ecosystem"],
+        "description": lib["description"],
+        "short_description": lib["short_description"],
+        "aliases": lib["aliases"],
+        "keywords": lib["keywords"],
+        "category": lib["category"],
+        "homepage_url": lib["homepage_url"],
+        "repository_url": lib["repository_url"],
+        "author": lib["author"],
+        "license": lib["license"],
+        "status": lib["status"],
+        "popularity_score": lib["popularity_score"],
+        "created_at": lib["created_at"],
+        "updated_at": lib["updated_at"],
+        "document_count": lib["document_count"],
     }
 
 

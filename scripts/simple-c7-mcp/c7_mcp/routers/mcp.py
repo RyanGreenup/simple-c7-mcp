@@ -9,13 +9,11 @@ from c7_mcp.schemas.mcp import (
     JSONRPCRequest,
     JSONRPCResponse,
     JSONRPCResult,
-    QueryDocsArgs,  # noqa: F401 - Will be used when TODO is implemented
-    ResolveLibraryIdArgs,  # noqa: F401 - Will be used when TODO is implemented
+    QueryDocsArgs,
+    ResolveLibraryIdArgs,
     TextContent,
 )
-from c7_mcp.services import (
-    mcp as mcp_service,  # noqa: F401 - Will be used when TODO is implemented
-)
+from c7_mcp.services import mcp as mcp_service
 
 router = APIRouter()
 
@@ -37,17 +35,6 @@ async def mcp_endpoint(request: JSONRPCRequest) -> JSONRPCResponse:
 
     Raises:
         HTTPException: 400 if method not supported or invalid params.
-        HTTPException: 501 if tool not implemented yet.
-
-    TODO: Implement complete JSON-RPC method routing.
-    TODO: 1. Validate request.method is "tools/call"
-    TODO: 2. Extract tool name from request.params.name
-    TODO: 3. Dispatch to appropriate tool handler
-    TODO: 4. Handle resolve-library-id tool
-    TODO: 5. Handle query-docs tool
-    TODO: 6. Wrap result in TextContent and JSONRPCResult
-    TODO: 7. Handle errors and return JSON-RPC error responses
-    TODO: 8. Add logging for tool invocations
     """
     # Validate method
     if request.method != "tools/call":
@@ -61,18 +48,13 @@ async def mcp_endpoint(request: JSONRPCRequest) -> JSONRPCResponse:
 
     tool_name = request.params.name
 
-    # TODO: Implement tool routing
     if tool_name == "resolve-library-id":
-        # TODO: Parse arguments using ResolveLibraryIdArgs
-        # TODO: Call mcp_service.resolve_library_id()
-        # TODO: Wrap result in TextContent
-        result_text = "TODO: Implement resolve-library-id tool"
+        args = ResolveLibraryIdArgs.model_validate(request.params.arguments)
+        result_text = mcp_service.resolve_library_id(args.library_name, args.query)
 
     elif tool_name == "query-docs":
-        # TODO: Parse arguments using QueryDocsArgs
-        # TODO: Call mcp_service.query_docs()
-        # TODO: Wrap result in TextContent
-        result_text = "TODO: Implement query-docs tool"
+        args = QueryDocsArgs.model_validate(request.params.arguments)
+        result_text = mcp_service.query_docs(args.library_id, args.query)
 
     else:
         raise HTTPException(

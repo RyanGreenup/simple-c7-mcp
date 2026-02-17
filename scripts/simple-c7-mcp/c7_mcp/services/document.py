@@ -224,22 +224,30 @@ def get_document(doc_id: str) -> DocumentData:
 
     Raises:
         ValueError: If document not found.
-
-    TODO: Implement document retrieval logic.
-    TODO: 1. Query database by ID
-    TODO: 2. Include all metadata
-    TODO: 3. Raise ValueError if not found
     """
-    # Placeholder implementation
-    now = datetime.now()
+    import json
+
+    from c7_mcp.db import get_documents_table
+
+    documents = get_documents_table()
+    results = (
+        documents.search()
+        .where(f"document_id = '{doc_id}'", prefilter=True)
+        .limit(1)
+        .to_list()
+    )
+    if not results:
+        raise ValueError(f"Document '{doc_id}' not found")
+    chunk = results[0]
+    metadata = json.loads(chunk.get("metadata_json", "{}"))
     return {
         "id": doc_id,
-        "title": "Placeholder Document",
-        "library_id": "lib-placeholder",
-        "content": "Placeholder content",
-        "created_at": now,
-        "updated_at": now,
-        "has_embeddings": False,
+        "title": chunk["title"],
+        "library_id": chunk["library_id"],
+        "content": chunk["text"],
+        "created_at": chunk["created_at"],
+        "updated_at": chunk["created_at"],
+        "has_embeddings": metadata.get("has_real_embeddings", False),
     }
 
 
@@ -254,14 +262,8 @@ def get_content(doc_id: str) -> str:
 
     Raises:
         ValueError: If document not found.
-
-    TODO: Implement content retrieval logic.
-    TODO: 1. Query database by ID
-    TODO: 2. Return only content field
-    TODO: 3. Raise ValueError if not found
     """
-    # Placeholder implementation
-    return "Placeholder content"
+    return get_document(doc_id)["content"]
 
 
 def get_embeddings(doc_id: str) -> EmbeddingData:

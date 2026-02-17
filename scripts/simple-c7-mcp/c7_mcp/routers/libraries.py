@@ -115,13 +115,14 @@ async def get_library(library_id: str) -> LibraryResponse:
         HTTPException: 404 if library not found.
         HTTPException: 501 if not implemented yet.
 
-    TODO: Implement library retrieval endpoint.
-    TODO: 1. Call library_service.get_library()
-    TODO: 2. Transform LibraryData to LibraryResponse
-    TODO: 3. Handle not found errors (404)
-    TODO: 4. Handle other errors (500)
     """
-    raise HTTPException(status_code=501, detail="Not implemented")
+    try:
+        data = library_service.get_library(library_id)
+        return LibraryResponse(**data)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get library: {str(e)}")
 
 
 @router.put("/{library_id}", response_model=LibraryResponse)

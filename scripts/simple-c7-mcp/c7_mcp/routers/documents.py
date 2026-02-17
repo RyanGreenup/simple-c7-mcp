@@ -157,13 +157,21 @@ async def get_document(doc_id: str) -> DocumentResponse:
         HTTPException: 404 if document not found.
         HTTPException: 501 if not implemented yet.
 
-    TODO: Implement document metadata retrieval endpoint.
-    TODO: 1. Call document_service.get_document()
-    TODO: 2. Transform DocumentData to DocumentResponse (exclude content)
-    TODO: 3. Handle not found errors (404)
-    TODO: 4. Handle other errors (500)
     """
-    raise HTTPException(status_code=501, detail="Not implemented")
+    try:
+        data = document_service.get_document(doc_id)
+        return DocumentResponse(
+            id=data["id"],
+            title=data["title"],
+            library_id=data["library_id"],
+            created_at=data["created_at"],
+            updated_at=data["updated_at"],
+            has_embeddings=data["has_embeddings"],
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get document: {str(e)}")
 
 
 @router.get("/{doc_id}/content", response_model=DocumentContent)
@@ -178,15 +186,14 @@ async def get_document_content(doc_id: str) -> DocumentContent:
 
     Raises:
         HTTPException: 404 if document not found.
-        HTTPException: 501 if not implemented yet.
-
-    TODO: Implement content retrieval endpoint.
-    TODO: 1. Call document_service.get_content()
-    TODO: 2. Return DocumentContent with raw text
-    TODO: 3. Handle not found errors (404)
-    TODO: 4. Handle other errors (500)
     """
-    raise HTTPException(status_code=501, detail="Not implemented")
+    try:
+        content = document_service.get_content(doc_id)
+        return DocumentContent(content=content)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get content: {str(e)}")
 
 
 @router.get("/{doc_id}/pretty", response_model=DocumentPretty)
