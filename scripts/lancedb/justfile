@@ -922,6 +922,129 @@ fetch-all:
 
     sys.exit(0 if not failed else 1)
 
+# List all documented fetch groups.
+fetch-docs-groups:
+    #!/usr/bin/env python3
+    groups = [
+        "frontend",
+        "ui",
+        "data_viz",
+        "db_tools",
+        "python_backend",
+        "rust_backend",
+        "python_ml",
+        "js_ml",
+        "validation",
+        "testing",
+        "auth",
+        "realtime",
+        "runtimes",
+        "devops",
+        "build_tools",
+        "languages",
+        "monorepo",
+        "logging",
+        "vector_search",
+        "utilities",
+        "all",
+    ]
+    print("Available groups:")
+    for name in groups:
+        print(f"  - {name}")
+
+# Fetch a documented group by name. Example: just fetch-docs-group frontend "solidjs routing docs"
+fetch-docs-group group query="":
+    #!/usr/bin/env python3
+    import subprocess
+    import sys
+
+    target_group = "{{ group }}"
+    query_override = "{{ query }}".strip()
+
+    groups = {
+        "frontend": [
+            "solid-js", "@solidjs/router", "@solidjs/start", "@kobalte/core",
+            "vue", "nuxt",
+        ],
+        "ui": ["tailwindcss", "daisyui", "chart.js"],
+        "data_viz": ["@tanstack/solid-table", "@tanstack/solid-virtual", "papaparse", "d3"],
+        "db_tools": ["duckdb", "better-sqlite3", "postgres", "clickhouse", "polars", "pandas"],
+        "python_backend": ["fastapi", "typer", "pydantic", "requests"],
+        "rust_backend": ["poem", "tokio", "serde"],
+        "python_ml": ["torch", "numpy", "scipy", "matplotlib", "seaborn", "transformers", "langchain", "onnx"],
+        "js_ml": ["onnxruntime-web"],
+        "validation": ["zod"],
+        "testing": ["vitest", "@playwright/test", "pytest"],
+        "auth": ["auth.js"],
+        "realtime": ["ws", "socket.io"],
+        "runtimes": ["deno", "bun"],
+        "devops": ["docker", "podman"],
+        "build_tools": ["vite"],
+        "languages": ["typescript", "rust", "go", "python"],
+        "monorepo": ["turborepo"],
+        "logging": ["pino", "structlog"],
+        "vector_search": ["lancedb", "pgvector"],
+        "utilities": ["fuse.js", "leaflet"],
+    }
+
+    library_queries = {
+        "@solidjs/start": "SolidStart framework routing redirect server actions",
+        "@solidjs/router": "Solid Router routes navigation params",
+        "@kobalte/core": "Kobalte Solid UI component library docs",
+        "chart.js": "Chart.js JavaScript charting documentation",
+        "postgres": "PostgreSQL official documentation SQL reference",
+        "torch": "PyTorch tensors autograd nn module docs",
+        "transformers": "Hugging Face Transformers models pipelines tokenizers docs",
+        "langchain": "LangChain Python documentation chains agents retrievers",
+        "auth.js": "Auth.js authentication providers sessions callbacks docs",
+        "ws": "ws Node.js WebSocket library API docs",
+        "python": "Python language standard library documentation",
+        "go": "Go language official documentation standard library",
+        "rust": "Rust language standard library and cargo docs",
+        "lancedb": "LanceDB vector database Python docs",
+        "pgvector": "pgvector PostgreSQL vector similarity extension docs",
+    }
+
+    if target_group == "all":
+        seen = set()
+        libraries = []
+        for libs in groups.values():
+            for lib in libs:
+                if lib not in seen:
+                    seen.add(lib)
+                    libraries.append(lib)
+    else:
+        libraries = groups.get(target_group)
+        if libraries is None:
+            print(f"Unknown group: {target_group}")
+            print("Run `just fetch-docs-groups` to see valid group names.")
+            sys.exit(1)
+
+    print(f"Fetching {len(libraries)} libraries from group '{target_group}'...")
+    print()
+
+    success = 0
+    failed = 0
+
+    for i, library in enumerate(libraries, 1):
+        print(f"[{i}/{len(libraries)}] {library}")
+        query = query_override or library_queries.get(
+            library, f"{library} official documentation API reference"
+        )
+        result = subprocess.run(["just", "fetch-library", library, query], timeout=180)
+        if result.returncode == 0:
+            success += 1
+        else:
+            failed += 1
+        print()
+
+    print(f"Done. Success: {success}, Failed: {failed}")
+    sys.exit(0 if failed == 0 else 1)
+
+# Fetch every documentation target listed in this justfile's categorized sections.
+fetch-all-described query="":
+    just fetch-docs-group all "{{query}}"
+
 # Libraries appropriate for Context7 documentation fetching:
 #
 # === Frontend Frameworks ===
