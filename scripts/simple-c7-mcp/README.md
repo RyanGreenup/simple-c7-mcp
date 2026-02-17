@@ -18,6 +18,202 @@ just create-library "FastAPI" "Python" "pypi" "Modern web framework"
 just fetch-doc "solid-js"
 ```
 
+## Add This Server to Codex
+
+This project exposes an MCP endpoint at `http://localhost:8000/mcp`. You can register it as an MCP server in Codex.
+
+### Recommended setup (remote HTTP MCP server)
+
+Use this when `simple-c7-mcp` is already running (for example via `just serve`).
+
+```bash
+codex mcp add simple-c7-mcp --url http://localhost:8000/mcp
+```
+
+Then verify:
+
+```bash
+codex mcp list
+codex mcp get simple-c7-mcp
+```
+
+### Scope options
+
+By default, Codex writes MCP configuration to the current project (`.codex/config.toml`).
+
+To make it available across all projects:
+
+```bash
+codex mcp add -s user simple-c7-mcp --url http://localhost:8000/mcp
+```
+
+User-level config path:
+- `~/.codex/config.toml`
+
+### How to use it in Codex
+
+1. Start this server so the endpoint is available:
+
+```bash
+just serve
+```
+
+2. Confirm Codex can see it:
+
+```bash
+codex mcp list
+codex mcp get simple-c7-mcp
+```
+
+3. Ask Codex to perform docs tasks via MCP tools. Example prompts:
+- "Resolve the library ID for React and query docs for useEffect cleanup."
+- "Query docs for `/npm/react` and summarize key points about effects."
+- "Find authentication examples in FastAPI docs."
+
+### Is "search docs" a special command?
+
+No. `search docs` is plain natural language, not a reserved Codex keyword. Codex decides whether to call MCP/tools based on your request and configured tools.
+
+### Quick connectivity check
+
+If Codex cannot use the MCP server:
+
+1. Verify the endpoint is reachable:
+
+```bash
+curl -s http://localhost:8000/mcp
+```
+
+2. Re-check registration:
+
+```bash
+codex mcp list
+codex mcp get simple-c7-mcp
+```
+
+3. Re-add the server if needed:
+
+```bash
+codex mcp remove simple-c7-mcp
+codex mcp add simple-c7-mcp --url http://localhost:8000/mcp
+```
+
+### Quick troubleshooting
+
+1. Confirm the API is running:
+
+```bash
+just health
+```
+
+2. If Codex still cannot connect, remove and re-add:
+
+```bash
+codex mcp remove simple-c7-mcp
+codex mcp add simple-c7-mcp --url http://localhost:8000/mcp
+```
+
+### Sources
+
+- [OpenAI Codex MCP docs](https://developers.openai.com/codex/mcp)
+- [OpenAI platform MCP docs](https://platform.openai.com/docs/guides/tools-remote-mcp)
+- [OpenAI Tools guide](https://platform.openai.com/docs/guides/tools)
+
+## Add This Server to Claude Code
+
+You can also register this MCP endpoint with Claude Code.
+
+### Recommended setup (remote HTTP MCP server)
+
+Start this server first (`just serve`), then add it:
+
+```bash
+claude mcp add --transport http simple-c7-mcp http://localhost:8000/mcp
+```
+
+Then verify:
+
+```bash
+claude mcp list
+claude mcp get simple-c7-mcp
+```
+
+### Scope options
+
+Claude Code supports `local`, `project`, and `user` scopes.
+- `local` (default): only for you in this project context
+- `project`: shared via `.mcp.json` in the repo root
+- `user`: available to you across projects
+
+Example (user scope):
+
+```bash
+claude mcp add --transport http --scope user simple-c7-mcp http://localhost:8000/mcp
+```
+
+### Alternative setup (stdio/local process)
+
+If you prefer launching a local process instead of connecting over HTTP:
+
+```bash
+claude mcp add --transport stdio simple-c7-mcp-local -- uv run c7-mcp serve --port 8000
+```
+
+Then verify:
+
+```bash
+claude mcp list
+claude mcp get simple-c7-mcp-local
+```
+
+### How to use it in Claude Code
+
+1. Start the server:
+
+```bash
+just serve
+```
+
+2. Confirm Claude sees it:
+
+```bash
+claude mcp list
+claude mcp get simple-c7-mcp
+```
+
+3. In Claude Code, ask for MCP-powered docs tasks, for example:
+- "Resolve the library ID for React and query docs for useEffect cleanup."
+- "Query docs for `/npm/react` and summarize effect lifecycle guidance."
+- "Find authentication examples in FastAPI docs."
+
+### Quick connectivity check
+
+If Claude Code cannot use the server:
+
+1. Check endpoint reachability:
+
+```bash
+curl -s http://localhost:8000/mcp
+```
+
+2. Re-check Claude registration:
+
+```bash
+claude mcp list
+claude mcp get simple-c7-mcp
+```
+
+3. Re-add the server:
+
+```bash
+claude mcp remove simple-c7-mcp
+claude mcp add --transport http simple-c7-mcp http://localhost:8000/mcp
+```
+
+### Sources
+
+- [Claude Code MCP docs](https://docs.anthropic.com/en/docs/claude-code/mcp)
+
 ## 📚 Documentation
 
 This project has comprehensive documentation. **Start here:**
