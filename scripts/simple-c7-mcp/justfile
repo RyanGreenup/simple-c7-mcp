@@ -301,9 +301,29 @@ fetch-doc library query port="8000":
             # Library already exists, that's OK
             error = json.loads(e.read().decode('utf-8'))
             if 'already exists' in error['detail']:
-                print(f"ℹ️  Library already exists, continuing...")
-                # For now, use a placeholder ID - in production, we'd query for it
-                our_library_id = f"lib-{ecosystem}-{library.lower()}"
+                print(f"ℹ️  Library already exists, querying for ID...")
+                # Query the libraries endpoint to find the existing library
+                list_req = urllib.request.Request(lib_api_url)
+                try:
+                    with urllib.request.urlopen(list_req) as list_response:
+                        all_libs = json.loads(list_response.read().decode('utf-8'))
+                        # Find library by name and ecosystem
+                        matching_lib = None
+                        for lib in all_libs:
+                            if lib['name'].lower() == library.lower() and lib['ecosystem'] == ecosystem:
+                                matching_lib = lib
+                                break
+
+                        if matching_lib:
+                            our_library_id = matching_lib['id']
+                            print(f"✅ Found existing library: {matching_lib['name']}")
+                            print(f"   ID: {our_library_id}")
+                        else:
+                            print(f"❌ Library exists but couldn't find it in the list")
+                            sys.exit(1)
+                except Exception as query_error:
+                    print(f"❌ Failed to query libraries: {query_error}")
+                    sys.exit(1)
             else:
                 print(f"❌ Error: {error['detail']}")
                 sys.exit(1)
@@ -388,7 +408,69 @@ fetch-vue port="8000":
 fetch-daisyui port="8000":
     just fetch-doc "daisyui" "How to use button and card components in DaisyUI" {{ port }}
 
-# Clean the database
+# ============================================================================
+# Database Inspection Commands
+# ============================================================================
+
+# Open a DuckDB SQL shell with LanceDB data loaded
+sql table="libraries" db_path="./lancedb_data":
+    #!/usr/bin/env python3
+    import sys
+    import subprocess
+    from pathlib import Path
+
+    db_path = "{{ db_path }}"
+    table = "{{ table }}"
+
+    if not Path(db_path).exists():
+        print(f"⚠️  Database not found at: {db_path}")
+        print("Run 'just serve' first to initialize the database")
+        sys.exit(1)
+
+    print("🦆 Opening DuckDB SQL shell with LanceDB data...")
+    print(f"📊 Database: {db_path}")
+    print(f"📋 Table: {table}")
+    print()
+    print("Available tables:")
+    print("  - libraries (library metadata)")
+    print("  - documents (document chunks with embeddings)")
+    print()
+    print("Example queries:")
+    print("  SELECT COUNT(*) FROM data;")
+    print("  SELECT name, ecosystem, document_count FROM data LIMIT 10;")
+    if table == "documents":
+        print("  SELECT title, library_name, chunk_index FROM data LIMIT 10;")
+    print("  .schema data")
+    print()
+
+    # Build Lance scan path
+    view_path = f"{db_path}/{table}.lance"
+
+    if not Path(view_path).exists():
+        print(f"❌ Table '{table}' not found at: {view_path}")
+        print(f"Available tables: libraries, documents")
+        sys.exit(1)
+
+    # Build init commands
+    commands = []
+    commands.append("INSTALL lance FROM community;")
+    commands.append("LOAD lance;")
+    commands.append(f"CREATE OR REPLACE VIEW data AS SELECT * FROM __lance_scan('{view_path}');")
+    commands.append(".timer on")
+    commands.append("SELECT '🎯 Connected! Table \"data\" has ' || COUNT(*)::VARCHAR || ' rows' as status FROM data;")
+    init_script = "\n".join(commands)
+
+    # Build the bash command with heredoc
+    bash_cmd = f"duckdb -init <(cat <<'INITEOF'\n{init_script}\nINITEOF\n)"
+
+    subprocess.run(['bash', '-c', bash_cmd])
+
+# Open SQL shell for documents table
+sql-docs db_path="./lancedb_data":
+    just sql "documents" {{ db_path }}
+
+# Clean the database (WARNING: deletes all data)
 clean-db:
     rm -rf lancedb_data
     @echo "✅ Database cleaned"
+    @echo "⚠️  Run 'just serve' to reinitialize"

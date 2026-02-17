@@ -40,6 +40,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "granian", extra = ["reload"] },
     { name = "lancedb" },
+    { name = "pydantic" },
     { name = "typer" },
 ]
 
@@ -55,6 +56,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "granian", extras = ["reload"], specifier = ">=1.0.0" },
     { name = "lancedb", specifier = ">=0.15.0" },
+    { name = "pydantic", specifier = ">=2.12.5" },
     { name = "typer", specifier = ">=0.20.0" },
 ]
 

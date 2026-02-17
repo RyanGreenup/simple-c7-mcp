@@ -61,15 +61,38 @@ def list_libraries() -> list[LibraryData]:
 
     Returns:
         List of all libraries with their metadata.
-
-    TODO: Implement library listing logic.
-    TODO: 1. Query database for all libraries
-    TODO: 2. Include document counts
-    TODO: 3. Order by creation date or name
-    TODO: 4. Support pagination parameters
     """
-    # Placeholder implementation
-    return []
+    libraries = get_libraries_table()
+
+    # Query all libraries
+    results = libraries.search().limit(1000).to_list()
+
+    # Convert to LibraryData format
+    library_list = []
+    for lib in results:
+        library_list.append({
+            "id": lib["id"],
+            "name": lib["name"],
+            "context7_id": lib["context7_id"],
+            "language": lib["language"],
+            "ecosystem": lib["ecosystem"],
+            "description": lib["description"],
+            "short_description": lib["short_description"],
+            "aliases": lib["aliases"],
+            "keywords": lib["keywords"],
+            "category": lib["category"],
+            "homepage_url": lib["homepage_url"],
+            "repository_url": lib["repository_url"],
+            "author": lib["author"],
+            "license": lib["license"],
+            "status": lib["status"],
+            "popularity_score": lib["popularity_score"],
+            "created_at": lib["created_at"],
+            "updated_at": lib["updated_at"],
+            "document_count": lib["document_count"],
+        })
+
+    return library_list
 
 
 def create_library(

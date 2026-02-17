@@ -12,9 +12,7 @@ from c7_mcp.schemas.library import (
     LibraryResponse,
     LibraryUpdate,
 )
-from c7_mcp.services import (
-    library as library_service,  # noqa: F401 - Will be used when TODOs are implemented
-)
+from c7_mcp.services import library as library_service
 
 router = APIRouter(prefix="/api/v1/libraries", tags=["libraries"])
 
@@ -26,13 +24,21 @@ async def list_libraries() -> list[LibraryResponse]:
     Returns:
         List of all libraries with metadata and document counts.
 
-    TODO: Implement library listing endpoint.
-    TODO: 1. Call library_service.list_libraries()
-    TODO: 2. Transform LibraryData to LibraryResponse
-    TODO: 3. Handle errors (500 for internal errors)
+    Raises:
+        HTTPException: 500 if internal server error.
     """
-    # Placeholder implementation
-    return []
+    try:
+        # Call service function
+        libraries = library_service.list_libraries()
+
+        # Transform LibraryData to LibraryResponse
+        return [LibraryResponse(**lib) for lib in libraries]
+
+    except Exception as e:
+        # Handle unexpected errors
+        raise HTTPException(
+            status_code=500, detail=f"Failed to list libraries: {str(e)}"
+        )
 
 
 @router.post("", response_model=LibraryResponse, status_code=201)

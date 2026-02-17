@@ -12,6 +12,7 @@ dependencies = [
     "fastapi>=0.115.0",
     "granian[reload]>=1.0.0",
     "lancedb>=0.15.0",
+    "pydantic>=2.12.5",
     "typer>=0.20.0",
 ]
 

@@ -21,9 +21,7 @@ from c7_mcp.schemas.document import (
     TitleUpdate,
 )
 from c7_mcp.schemas.library import DeleteResponse
-from c7_mcp.services import (
-    document as document_service,  # noqa: F401 - Will be used when TODOs are implemented
-)
+from c7_mcp.services import document as document_service
 
 router = APIRouter(prefix="/api/v1/documents", tags=["documents"])
 
@@ -44,15 +42,33 @@ async def list_documents(
     Returns:
         List of documents with metadata (no content).
 
-    TODO: Implement document listing endpoint.
-    TODO: 1. Call document_service.list_documents()
-    TODO: 2. Transform DocumentData to DocumentResponse
-    TODO: 3. Apply library_id filter if provided
-    TODO: 4. Apply pagination (limit, offset)
-    TODO: 5. Handle errors (500 for internal errors)
+    Raises:
+        HTTPException: 500 if internal server error.
     """
-    # Placeholder implementation
-    return []
+    try:
+        # Call service function
+        documents = document_service.list_documents(
+            library_id=library_id, limit=limit, offset=offset
+        )
+
+        # Transform DocumentData to DocumentResponse (exclude content)
+        return [
+            DocumentResponse(
+                id=doc["id"],
+                title=doc["title"],
+                library_id=doc["library_id"],
+                created_at=doc["created_at"],
+                updated_at=doc["updated_at"],
+                has_embeddings=doc["has_embeddings"],
+            )
+            for doc in documents
+        ]
+
+    except Exception as e:
+        # Handle unexpected errors
+        raise HTTPException(
+            status_code=500, detail=f"Failed to list documents: {str(e)}"
+        )
 
 
 @router.post("", response_model=DocumentResponse, status_code=201)
@@ -67,15 +83,39 @@ async def create_document(document: DocumentCreate) -> DocumentResponse:
 
     Raises:
         HTTPException: 404 if library not found.
-        HTTPException: 501 if not implemented yet.
-
-    TODO: Implement document creation endpoint.
-    TODO: 1. Call document_service.create_document()
-    TODO: 2. Transform DocumentData to DocumentResponse
-    TODO: 3. Handle library not found errors (404)
-    TODO: 4. Handle other errors (500)
+        HTTPException: 500 if internal server error.
     """
-    raise HTTPException(status_code=501, detail="Not implemented")
+    try:
+        # Call service function
+        data = document_service.create_document(
+            title=document.title,
+            content=document.content,
+            library_id=document.library_id,
+        )
+
+        # Transform DocumentData to DocumentResponse (exclude content field)
+        return DocumentResponse(
+            id=data["id"],
+            title=data["title"],
+            library_id=data["library_id"],
+            created_at=data["created_at"],
+            updated_at=data["updated_at"],
+            has_embeddings=data["has_embeddings"],
+        )
+
+    except ValueError as e:
+        # Handle library not found
+        error_msg = str(e)
+        if "not found" in error_msg.lower():
+            raise HTTPException(status_code=404, detail=error_msg)
+        else:
+            raise HTTPException(status_code=400, detail=error_msg)
+
+    except Exception as e:
+        # Handle unexpected errors
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create document: {str(e)}"
+        )
 
 
 @router.post("/fetch", response_model=DocumentResponse, status_code=201)
