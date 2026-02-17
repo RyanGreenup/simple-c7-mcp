@@ -739,12 +739,42 @@ import-volume file="systemd-c7-mcp-data.tar":
         -v {{ volume_name }}:/data \
         docker.io/library/busybox:latest \
         chown -R {{ container_uid }}:{{ container_gid }} /data
-    # Relabel for SELinux if available
-    -@podman run --rm --security-opt label=disable \
+    # Relabel for SELinux if available (no-op on non-SELinux systems)
+    podman run --rm --security-opt label=disable \
         -v {{ volume_name }}:/data:Z \
         docker.io/library/busybox:latest \
-        true
-    @echo "Imported {{ file }} into {{ volume_name }}"
+        true 2>/dev/null || true
+    echo "Imported {{ file }} into {{ volume_name }}"
+
+# ============================================================================
+# Quadlet Deployment Commands
+# ============================================================================
+
+quadlet_dir := env("HOME") / ".config/containers/systemd"
+
+# Install quadlet units, reload systemd, and start the service
+quadlet-install: quadlet-build
+    mkdir -p {{ quadlet_dir }}
+    cp quadlet/*.volume quadlet/*.container {{ quadlet_dir }}/
+    systemctl --user daemon-reload
+    systemctl --user start c7-mcp
+
+# Build the container image for quadlet deployment
+quadlet-build:
+    podman build -t localhost/c7-mcp:latest .
+
+# Stop and remove the quadlet units
+quadlet-uninstall:
+    -systemctl --user stop c7-mcp
+    rm -f {{ quadlet_dir }}/c7-mcp.container {{ quadlet_dir }}/c7-mcp-data.volume
+    systemctl --user daemon-reload
+
+# Show quadlet service status and logs
+quadlet-status:
+    systemctl --user status c7-mcp
+
+quadlet-logs:
+    journalctl --user -u c7-mcp -f
 
 # Clean the database (WARNING: deletes all data)
 clean-db:
