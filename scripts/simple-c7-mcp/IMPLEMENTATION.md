@@ -5,17 +5,17 @@ This document tracks the implementation progress of all CRUD operations for the 
 ## Overview
 
 - **Total Tasks**: 25
-- **Completed**: 8
+- **Completed**: 11
 - **In Progress**: 0
-- **Not Started**: 17
+- **Not Started**: 14
 
 ## 📊 Progress by Category
 
 | Category       | Total | Completed | In Progress | Not Started |
 | -------------- | ----- | --------- | ----------- | ----------- |
 | MCP Tools      | 2     | 2         | 0           | 0           |
-| Library CRUD   | 6     | 2         | 0           | 4           |
-| Document CRUD  | 13    | 4         | 0           | 9           |
+| Library CRUD   | 6     | 4         | 0           | 2           |
+| Document CRUD  | 13    | 5         | 0           | 8           |
 | Infrastructure | 3     | 0         | 0           | 3           |
 | Testing        | 1     | 0         | 0           | 1           |
 
@@ -128,41 +128,45 @@ This document tracks the implementation progress of all CRUD operations for the 
 
 ### Task #19: Implement library full update endpoint
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Completed
 **Priority**: Medium
 **Files**: `c7_mcp/services/library.py`, `c7_mcp/routers/libraries.py`
 **Endpoint**: `PUT /api/v1/libraries/{library_id}`
 
 **Implementation Steps**:
 
-- [ ] Verify library exists in database
-- [ ] Validate name uniqueness (excluding current library)
-- [ ] Update all fields (name, description)
-- [ ] Update updated_at timestamp
-- [ ] Transform LibraryData to LibraryResponse in router
-- [ ] Handle not found errors with 404 status
-- [ ] Handle duplicate name errors with 400 status
-- [ ] Handle other errors with 500 status
+- [x] Verify library exists in database
+- [x] Validate name uniqueness (excluding current library)
+- [x] Update all fields (name, description)
+- [x] Update updated_at timestamp
+- [x] Transform LibraryData to LibraryResponse in router
+- [x] Handle not found errors with 404 status
+- [x] Handle duplicate name errors with 400 status
+- [x] Handle other errors with 500 status
+
+**Design Decision**: Uses delete-then-re-add pattern. Preserves all non-updated fields from existing record.
 
 ---
 
 ### Task #20: Implement library partial update endpoint
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Completed
 **Priority**: Medium
 **Files**: `c7_mcp/services/library.py`, `c7_mcp/routers/libraries.py`
 **Endpoint**: `PATCH /api/v1/libraries/{library_id}`
 
 **Implementation Steps**:
 
-- [ ] Verify library exists in database
-- [ ] Update only provided fields
-- [ ] Validate name uniqueness if name provided
-- [ ] Update updated_at timestamp
-- [ ] Transform LibraryData to LibraryResponse in router
-- [ ] Handle not found errors with 404 status
-- [ ] Handle duplicate name errors with 400 status
-- [ ] Handle other errors with 500 status
+- [x] Verify library exists in database
+- [x] Update only provided fields
+- [x] Validate name uniqueness if name provided
+- [x] Update updated_at timestamp
+- [x] Transform LibraryData to LibraryResponse in router
+- [x] Handle not found errors with 404 status
+- [x] Handle duplicate name errors with 400 status
+- [x] Handle other errors with 500 status
+
+**Design Decision**: Only updates fields that are explicitly provided (non-None). Uses same delete-then-re-add pattern.
 
 ---
 
@@ -292,18 +296,18 @@ This document tracks the implementation progress of all CRUD operations for the 
 
 ### Task #27: Implement document get pretty endpoint
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Completed
 **Priority**: Medium
 **Files**: `c7_mcp/routers/documents.py`
 **Endpoint**: `GET /api/v1/documents/{doc_id}/pretty`
 
 **Implementation Steps**:
 
-- [ ] Call document_service.get_document()
-- [ ] Return DocumentPretty with title and content
-- [ ] Apply formatting (markdown, syntax highlighting, etc.)
-- [ ] Handle not found errors with 404 status
-- [ ] Handle other errors with 500 status
+- [x] Call document_service.get_document()
+- [x] Return DocumentPretty with title and content
+- [x] Apply formatting (markdown, syntax highlighting, etc.)
+- [x] Handle not found errors with 404 status
+- [x] Handle other errors with 500 status
 
 ---
 
@@ -602,8 +606,8 @@ everything before them unblocks the path to get there.
 - [x]     `GET    /`                  — list all libraries
 - [x]     `POST   /`                  — create library
 - [x] `1.` `GET    /{id}`              — get library by ID
-- [ ] `9.` `PUT    /{id}`              — full update
-- [ ] `10.` `PATCH  /{id}`             — partial update
+- [x] `9.` `PUT    /{id}`              — full update
+- [x] `10.` `PATCH  /{id}`             — partial update
 - [x] `8.` `DELETE /{id}`              — delete library
 
 ### Documents (`/api/v1/documents`)
@@ -612,7 +616,7 @@ everything before them unblocks the path to get there.
 - [x] `6.` `POST   /fetch`             — create document (fetch from URL)
 - [x] `2.` `GET    /{id}`              — get document metadata
 - [x] `3.` `GET    /{id}/content`      — get raw content
-- [ ] `11.` `GET   /{id}/pretty`       — get title + content
+- [x] `11.` `GET   /{id}/pretty`       — get title + content
 - [ ] `13.` `GET   /{id}/title`        — get title only
 - [ ] `12.` `GET   /{id}/embeddings`   — get embedding vector
 - [ ] `14.` `PUT   /{id}`              — full update
