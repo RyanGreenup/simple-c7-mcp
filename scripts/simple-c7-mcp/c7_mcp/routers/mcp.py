@@ -1,167 +1,57 @@
-"""MCP JSON-RPC 2.0 endpoint router.
+"""MCP endpoint via the official Python MCP SDK (FastMCP).
 
-This module implements the Context7-compatible MCP endpoint using JSON-RPC 2.0 protocol.
+This module creates a FastMCP server instance, registers Context7-compatible
+tools, and exports the streamable HTTP ASGI sub-application for mounting.
+
+The sub-app uses the default ``streamable_http_path="/mcp"`` so the MCP
+endpoint lives at ``/mcp`` inside the sub-app.  The parent FastAPI app
+mounts the sub-app at ``"/"`` (after its own routes) so that
+``POST /mcp`` reaches this handler without a trailing-slash redirect.
 """
 
-from typing import Any
+from mcp.server.fastmcp import FastMCP
 
-from fastapi import APIRouter, HTTPException, Response
-from pydantic import ValidationError
-
-from c7_mcp.schemas.mcp import (
-    FetchLibraryDocsArgs,
-    QueryDocsArgs,
-    ResolveLibraryIdArgs,
-    ToolCallParams,
-)
 from c7_mcp.services import mcp as mcp_service
 
-router = APIRouter()
+mcp_server = FastMCP("simple-c7-mcp")
 
 
-def _validate_tool_args(model: type, arguments: dict) -> object:
-    """Validate tool arguments and map schema errors to HTTP 422."""
-    try:
-        return model.model_validate(arguments)
-    except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=exc.errors()) from exc
-
-
-def _jsonrpc_result(req_id: int | str | None, result: dict[str, Any]) -> dict[str, Any]:
-    """Build a JSON-RPC success response."""
-    response: dict[str, Any] = {"jsonrpc": "2.0", "result": result}
-    if req_id is not None:
-        response["id"] = req_id
-    return response
-
-
-@router.post("/mcp")
-async def mcp_endpoint(request: dict[str, Any]) -> Any:
-    """Handle MCP JSON-RPC 2.0 requests.
-
-    This endpoint implements the Context7 MCP protocol for tool invocation.
-    Supports the following tools:
-    - resolve-library-id: Resolve library name to Context7 ID
-    - query-docs: Query documentation by library ID
-    - fetch-library-docs: Fetch and ingest docs if library is missing
+@mcp_server.tool(name="resolve-library-id")
+def resolve_library_id(libraryName: str, query: str) -> str:  # noqa: N803
+    """Resolve library name to Context7-compatible ID.
 
     Args:
-        request: JSON-RPC 2.0 request body.
-
-    Returns:
-        JSON-RPC 2.0 response.
-
-    Raises:
-        HTTPException: 400 if method not supported or invalid params.
+        libraryName: Name of the library (e.g., "React", "FastAPI").
+        query: User's query for context.
     """
-    req_id = request.get("id")
-    method = request.get("method")
-    params = request.get("params", {}) or {}
+    return mcp_service.resolve_library_id(libraryName, query)
 
-    if method == "initialize":
-        client_protocol = "2024-11-05"
-        if isinstance(params, dict):
-            client_protocol = str(params.get("protocolVersion", client_protocol))
-        return _jsonrpc_result(
-            req_id,
-            {
-                "protocolVersion": client_protocol,
-                "capabilities": {"tools": {"listChanged": False}},
-                "serverInfo": {"name": "simple-c7-mcp", "version": "0.1.0"},
-            },
-        )
 
-    if method == "tools/list":
-        return _jsonrpc_result(
-            req_id,
-            {
-                "tools": [
-                    {
-                        "name": "resolve-library-id",
-                        "description": "Resolve library name to Context7-compatible ID",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "libraryName": {"type": "string"},
-                                "query": {"type": "string"},
-                            },
-                            "required": ["libraryName", "query"],
-                        },
-                    },
-                    {
-                        "name": "query-docs",
-                        "description": "Query documentation by library ID",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "libraryId": {"type": "string"},
-                                "query": {"type": "string"},
-                            },
-                            "required": ["libraryId", "query"],
-                        },
-                    },
-                    {
-                        "name": "fetch-library-docs",
-                        "description": (
-                            "Fetch and ingest docs from Context7 only if missing "
-                            "and fetchIfMissing is true"
-                        ),
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "libraryName": {"type": "string"},
-                                "query": {"type": "string"},
-                                "fetchIfMissing": {"type": "boolean"},
-                            },
-                            "required": ["libraryName"],
-                        },
-                    },
-                ]
-            },
-        )
+@mcp_server.tool(name="query-docs")
+def query_docs(libraryId: str, query: str) -> str:  # noqa: N803
+    """Query documentation by library ID.
 
-    # JSON-RPC notifications do not expect a response body.
-    if isinstance(method, str) and method.startswith("notifications/"):
-        return Response(status_code=202)
+    Args:
+        libraryId: Context7-compatible library identifier.
+        query: Documentation query string.
+    """
+    return mcp_service.query_docs(libraryId, query)
 
-    if method != "tools/call":
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Unsupported method: {method}. "
-                "Supported: initialize, tools/list, tools/call."
-            ),
-        )
 
-    try:
-        tool_params = ToolCallParams.model_validate(params)
-    except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=exc.errors()) from exc
+@mcp_server.tool(name="fetch-library-docs")
+def fetch_library_docs(
+    libraryName: str,  # noqa: N803
+    query: str = "",
+    fetchIfMissing: bool = False,  # noqa: N803
+) -> str:
+    """Fetch and ingest docs from Context7 only if missing and fetchIfMissing is true.
 
-    tool_name = tool_params.name
+    Args:
+        libraryName: Name of the library to fetch.
+        query: Extra context to disambiguate remote resolution.
+        fetchIfMissing: Explicit opt-in to fetch from Context7 if missing.
+    """
+    return mcp_service.fetch_library_docs(libraryName, query, fetchIfMissing)
 
-    if tool_name == "resolve-library-id":
-        args = _validate_tool_args(ResolveLibraryIdArgs, tool_params.arguments)
-        result_text = mcp_service.resolve_library_id(args.library_name, args.query)
 
-    elif tool_name == "query-docs":
-        args = _validate_tool_args(QueryDocsArgs, tool_params.arguments)
-        result_text = mcp_service.query_docs(args.library_id, args.query)
-
-    elif tool_name == "fetch-library-docs":
-        args = _validate_tool_args(FetchLibraryDocsArgs, tool_params.arguments)
-        result_text = mcp_service.fetch_library_docs(
-            args.library_name,
-            args.query,
-            args.fetch_if_missing,
-        )
-
-    else:
-        raise HTTPException(
-            status_code=400, detail=f"Unknown tool: {tool_name}"
-        )
-
-    return _jsonrpc_result(
-        req_id,
-        {"content": [{"type": "text", "text": result_text}]},
-    )
+mcp_app = mcp_server.streamable_http_app()

@@ -35,7 +35,10 @@ async def lifespan(app: FastAPI):
     status = init_schema()
     print(f"Schema initialization: {status}")
 
-    yield
+    # Start the MCP session manager (mounted sub-app lifespans are not
+    # called by FastAPI, so we manage it here).
+    async with mcp.mcp_server.session_manager.run():
+        yield
 
     # Shutdown: Close database connections
     print("Closing database connections...")
@@ -91,8 +94,7 @@ async def database_error_handler(
     )
 
 
-# Include routers
-app.include_router(mcp.router)
+# Include REST routers first so they take priority over the catch-all mount.
 app.include_router(libraries.router)
 app.include_router(documents.router)
 
@@ -105,3 +107,10 @@ async def health_check() -> dict[str, str]:
         Dictionary with status information.
     """
     return {"status": "healthy", "service": "c7-mcp"}
+
+
+# Mount MCP sub-app at root LAST.  The sub-app's internal route is at
+# "/mcp" (the FastMCP default), so POST /mcp → sub-app receives "/mcp".
+# Because this mount comes after all explicit routes, /health and
+# /api/v1/* are matched first and never reach the sub-app.
+app.mount("/", mcp.mcp_app)

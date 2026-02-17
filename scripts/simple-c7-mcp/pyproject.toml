@@ -13,6 +13,7 @@ dependencies = [
     "granian[reload]>=1.0.0",
     "httpx>=0.28.1",
     "lancedb>=0.15.0",
+    "mcp>=1.26.0",
     "pydantic>=2.12.5",
     "typer>=0.20.0",
 ]
