@@ -584,3 +584,42 @@ When all tasks are complete:
 
 **Last Updated**: 2026-02-16
 **Document Version**: 1.0
+
+---
+
+## ✅ Implementation Status Checklist
+
+Numbers indicate recommended implementation order. MCP tools are the end goal;
+everything before them unblocks the path to get there.
+
+### Libraries (`/api/v1/libraries`)
+- [x]     `GET    /`                  — list all libraries
+- [x]     `POST   /`                  — create library
+- [ ] `1.` `GET    /{id}`              — get library by ID
+- [ ] `9.` `PUT    /{id}`              — full update
+- [ ] `10.` `PATCH  /{id}`             — partial update
+- [ ] `8.` `DELETE /{id}`              — delete library
+
+### Documents (`/api/v1/documents`)
+- [x]     `GET    /`                  — list documents (filter by library_id)
+- [x]     `POST   /`                  — create document (upload content)
+- [ ] `6.` `POST   /fetch`             — create document (fetch from URL)
+- [ ] `2.` `GET    /{id}`              — get document metadata
+- [ ] `3.` `GET    /{id}/content`      — get raw content
+- [ ] `11.` `GET   /{id}/pretty`       — get title + content
+- [ ] `13.` `GET   /{id}/title`        — get title only
+- [ ] `12.` `GET   /{id}/embeddings`   — get embedding vector
+- [ ] `14.` `PUT   /{id}`              — full update
+- [ ] `7.` `PATCH  /{id}/content`      — update content
+- [ ] `15.` `PATCH /{id}/title`        — update title
+- [ ] `16.` `PATCH /{id}/library`      — move to different library
+- [ ] `17.` `PATCH /{id}/embeddings`   — update embeddings
+- [ ] `18.` `DELETE /{id}`             — delete document
+
+### MCP Tools (`POST /mcp`)
+- [ ] `4.` `resolve-library-id` — resolve library name → Context7 ID
+- [ ] `5.` `query-docs` — query stored docs by library ID + query string
+
+
+
+
