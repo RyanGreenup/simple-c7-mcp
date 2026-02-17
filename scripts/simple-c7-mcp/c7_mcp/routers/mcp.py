@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import ValidationError
 
 from c7_mcp.schemas.mcp import (
+    FetchLibraryDocsArgs,
     JSONRPCRequest,
     JSONRPCResponse,
     JSONRPCResult,
@@ -35,6 +36,7 @@ async def mcp_endpoint(request: JSONRPCRequest) -> JSONRPCResponse:
     Supports the following tools:
     - resolve-library-id: Resolve library name to Context7 ID
     - query-docs: Query documentation by library ID
+    - fetch-library-docs: Fetch and ingest docs if library is missing
 
     Args:
         request: JSON-RPC 2.0 request with method and params.
@@ -64,6 +66,14 @@ async def mcp_endpoint(request: JSONRPCRequest) -> JSONRPCResponse:
     elif tool_name == "query-docs":
         args = _validate_tool_args(QueryDocsArgs, request.params.arguments)
         result_text = mcp_service.query_docs(args.library_id, args.query)
+
+    elif tool_name == "fetch-library-docs":
+        args = _validate_tool_args(FetchLibraryDocsArgs, request.params.arguments)
+        result_text = mcp_service.fetch_library_docs(
+            args.library_name,
+            args.query,
+            args.fetch_if_missing,
+        )
 
     else:
         raise HTTPException(

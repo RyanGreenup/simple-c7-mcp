@@ -2,7 +2,7 @@
 
 Tests POST /mcp exhaustively:
   - JSON-RPC 2.0 protocol conformance
-  - Tool dispatch: resolve-library-id, query-docs
+  - Tool dispatch: resolve-library-id, query-docs, fetch-library-docs
   - Response structure validated at every nesting level
   - Content correctness (text says expected things, not just correct shape)
   - Error paths and edge cases
@@ -737,6 +737,68 @@ def run_query_docs(client: httpx.Client, fix: Fixtures) -> Suite:
     return suite
 
 
+def run_fetch_library_docs(client: httpx.Client, fix: Fixtures) -> Suite:
+    """fetch-library-docs tool — safety and gating behavior."""
+    suite = Suite("MCP fetch-library-docs")
+
+    # Existing library should never trigger remote fetch.
+    mcp_call(
+        suite,
+        "existing local library → 200 with skip message",
+        client,
+        rpc("fetch-library-docs", {
+            "libraryName": TEST_LIB_NAME,
+            "query": "MCP integration tests",
+            "fetchIfMissing": True,
+        }),
+        200,
+        checks=[
+            (
+                lambda b: "already exists locally" in mcp_text(b).lower(),
+                "text says library already exists locally",
+            )
+        ],
+    )
+
+    # Missing library without explicit opt-in should not fetch remotely.
+    mcp_call(
+        suite,
+        "missing library without fetchIfMissing → 200 with guidance",
+        client,
+        rpc("fetch-library-docs", {
+            "libraryName": "DefinitelyMissingLibForFetchGuardXYZ",
+            "query": "test query",
+        }),
+        200,
+        checks=[
+            (
+                lambda b: "fetchifmissing" in mcp_text(b).lower(),
+                "text instructs to pass fetchIfMissing: true",
+            )
+        ],
+    )
+
+    # camelCase argument names are required.
+    call(
+        suite,
+        "snake_case 'fetch_if_missing' argument → 422 (wrong key)",
+        lambda: client.post("/mcp", json={
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {
+                "name": "fetch-library-docs",
+                "arguments": {
+                    "libraryName": "some-lib",
+                    "query": "docs",
+                    "fetch_if_missing": True,
+                },
+            },
+        }),
+        422,
+    )
+
+    return suite
+
+
 # ---------------------------------------------------------------------------
 # Runner + output
 # ---------------------------------------------------------------------------
@@ -780,6 +842,7 @@ def run_suites(client: httpx.Client) -> list[Suite]:
                 run_protocol(client, fix),
                 run_resolve_library(client, fix),
                 run_query_docs(client, fix),
+                run_fetch_library_docs(client, fix),
             ]
         )
     finally:

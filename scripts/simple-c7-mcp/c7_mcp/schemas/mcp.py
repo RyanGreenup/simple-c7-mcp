@@ -33,6 +33,20 @@ class QueryDocsArgs(BaseModel):
     query: str
 
 
+class FetchLibraryDocsArgs(BaseModel):
+    """Arguments for the fetch-library-docs tool.
+
+    Attributes:
+        library_name: Name of the library to fetch.
+        query: Extra context to disambiguate remote resolution.
+        fetch_if_missing: Explicit opt-in to fetch from Context7 if missing.
+    """
+
+    library_name: str = Field(..., alias="libraryName")
+    query: str = ""
+    fetch_if_missing: bool = Field(False, alias="fetchIfMissing")
+
+
 class ToolCallParams(BaseModel):
     """Parameters for the tools/call method.
 
