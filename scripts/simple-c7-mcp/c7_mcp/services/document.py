@@ -334,18 +334,32 @@ def get_embeddings(doc_id: str) -> EmbeddingData:
 
     Raises:
         ValueError: If document not found or has no embeddings.
-
-    TODO: Implement embeddings retrieval logic.
-    TODO: 1. Query database by ID
-    TODO: 2. Verify embeddings exist
-    TODO: 3. Return embedding vector and metadata
-    TODO: 4. Raise ValueError if not found or no embeddings
     """
-    # Placeholder implementation
+    import json
+
+    from c7_mcp.db import get_documents_table
+
+    documents = get_documents_table()
+    results = (
+        documents.search()
+        .where(f"document_id = '{doc_id}'", prefilter=True)
+        .limit(1)
+        .to_list()
+    )
+    if not results:
+        raise ValueError(f"Document '{doc_id}' not found")
+
+    chunk = results[0]
+    metadata = json.loads(chunk.get("metadata_json", "{}"))
+
+    if not metadata.get("has_real_embeddings", False):
+        raise ValueError(f"Document '{doc_id}' has no embeddings")
+
+    vector = chunk.get("vector", [])
     return {
-        "embeddings": [0.1, 0.2, 0.3],
-        "dimension": 3,
-        "model": "placeholder-model",
+        "embeddings": vector,
+        "dimension": len(vector),
+        "model": metadata.get("embedding_model"),
     }
 
 
@@ -414,6 +428,95 @@ def update_content(doc_id: str, content: str) -> DocumentData:
         "id": doc_id,
         "title": first_chunk["title"],
         "library_id": first_chunk["library_id"],
+        "content": content,
+        "created_at": original_created_at,
+        "updated_at": now,
+        "has_embeddings": False,
+    }
+
+
+def full_update_document(
+    doc_id: str, title: str, content: str, library_id: str
+) -> DocumentData:
+    """Full document update (title, content, and library).
+
+    Uses delete-then-re-add pattern since LanceDB has no UPDATE.
+    Invalidates embeddings since content changes.
+
+    Args:
+        doc_id: Document unique identifier.
+        title: New document title.
+        content: New document content.
+        library_id: Target library ID.
+
+    Returns:
+        Updated document data.
+
+    Raises:
+        ValueError: If document or target library not found.
+    """
+    import json
+
+    from c7_mcp.db import get_documents_table, get_libraries_table
+
+    documents = get_documents_table()
+    now = datetime.now()
+
+    # 1. Verify document exists
+    results = (
+        documents.search()
+        .where(f"document_id = '{doc_id}'", prefilter=True)
+        .limit(1000)
+        .to_list()
+    )
+    if not results:
+        raise ValueError(f"Document '{doc_id}' not found")
+
+    first_chunk = results[0]
+    original_created_at = first_chunk["created_at"]
+
+    # 2. Verify target library exists
+    libraries = get_libraries_table()
+    lib_results = (
+        libraries.search()
+        .where(f"id = '{library_id}'", prefilter=True)
+        .limit(1)
+        .to_list()
+    )
+    if not lib_results:
+        raise ValueError(f"Library with ID '{library_id}' not found")
+
+    library = lib_results[0]
+
+    # 3. Delete all existing chunks
+    documents.delete(f"document_id = '{doc_id}'")
+
+    # 4. Re-add with all new values
+    zero_vector = [0.0] * 2560
+    document_data = {
+        "id": hash(doc_id) & 0x7FFFFFFF,
+        "document_id": doc_id,
+        "library_id": library_id,
+        "title": title,
+        "text": content,
+        "chunk_index": 0,
+        "chunk_total": 1,
+        "source": first_chunk["source"],
+        "source_type": first_chunk["source_type"],
+        "vector": zero_vector,
+        "metadata_json": json.dumps({"has_real_embeddings": False}),
+        "created_at": original_created_at,
+        "library_name": library["name"],
+        "library_language": library["language"],
+        "library_ecosystem": library["ecosystem"],
+    }
+
+    documents.add([document_data])
+
+    return {
+        "id": doc_id,
+        "title": title,
+        "library_id": library_id,
         "content": content,
         "created_at": original_created_at,
         "updated_at": now,

@@ -5,9 +5,9 @@ This document tracks the implementation progress of all CRUD operations for the 
 ## Overview
 
 - **Total Tasks**: 25
-- **Completed**: 11
+- **Completed**: 14
 - **In Progress**: 0
-- **Not Started**: 14
+- **Not Started**: 11
 
 ## 📊 Progress by Category
 
@@ -15,7 +15,7 @@ This document tracks the implementation progress of all CRUD operations for the 
 | -------------- | ----- | --------- | ----------- | ----------- |
 | MCP Tools      | 2     | 2         | 0           | 0           |
 | Library CRUD   | 6     | 4         | 0           | 2           |
-| Document CRUD  | 13    | 5         | 0           | 8           |
+| Document CRUD  | 13    | 8         | 0           | 5           |
 | Infrastructure | 3     | 0         | 0           | 3           |
 | Testing        | 1     | 0         | 0           | 1           |
 
@@ -313,56 +313,58 @@ This document tracks the implementation progress of all CRUD operations for the 
 
 ### Task #28: Implement document get title endpoint
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Completed
 **Priority**: Low
 **Files**: `c7_mcp/routers/documents.py`
 **Endpoint**: `GET /api/v1/documents/{doc_id}/title`
 
 **Implementation Steps**:
 
-- [ ] Call document_service.get_document()
-- [ ] Return DocumentTitle with title only
-- [ ] Handle not found errors with 404 status
-- [ ] Handle other errors with 500 status
+- [x] Call document_service.get_document()
+- [x] Return DocumentTitle with title only
+- [x] Handle not found errors with 404 status
+- [x] Handle other errors with 500 status
 
 ---
 
 ### Task #29: Implement document get embeddings endpoint
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Completed
 **Priority**: High
 **Files**: `c7_mcp/services/document.py`, `c7_mcp/routers/documents.py`
 **Endpoint**: `GET /api/v1/documents/{doc_id}/embeddings`
 
 **Implementation Steps**:
 
-- [ ] Query database by document ID
-- [ ] Verify embeddings exist
-- [ ] Return embedding vector and metadata
-- [ ] Return DocumentEmbeddings with vectors in router
-- [ ] Handle not found errors with 404 status
-- [ ] Handle no embeddings errors with 404 and specific message
-- [ ] Handle other errors with 500 status
+- [x] Query database by document ID
+- [x] Verify embeddings exist
+- [x] Return embedding vector and metadata
+- [x] Return DocumentEmbeddings with vectors in router
+- [x] Handle not found errors with 404 status
+- [x] Handle no embeddings errors with 404 and specific message
+- [x] Handle other errors with 500 status
 
 ---
 
 ### Task #30: Implement document full update endpoint
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Completed
 **Priority**: Medium
-**Files**: `c7_mcp/routers/documents.py`
+**Files**: `c7_mcp/services/document.py`, `c7_mcp/routers/documents.py`
 **Endpoint**: `PUT /api/v1/documents/{doc_id}`
 
 **Implementation Steps**:
 
-- [ ] Combine update_content, update_title, update_library service calls
-- [ ] Verify document and target library exist
-- [ ] Update all fields (title, content, library_id)
-- [ ] Invalidate embeddings after content update (set has_embeddings to False)
-- [ ] Update updated_at timestamp
-- [ ] Transform DocumentData to DocumentResponse in router
-- [ ] Handle not found errors with 404 status
-- [ ] Handle other errors with 500 status
+- [x] Combine update_content, update_title, update_library service calls
+- [x] Verify document and target library exist
+- [x] Update all fields (title, content, library_id)
+- [x] Invalidate embeddings after content update (set has_embeddings to False)
+- [x] Update updated_at timestamp
+- [x] Transform DocumentData to DocumentResponse in router
+- [x] Handle not found errors with 404 status
+- [x] Handle other errors with 500 status
+
+**Design Decision**: Implemented as single `full_update_document` service function using delete-then-re-add, rather than chaining individual update calls. Verifies target library exists and updates denormalized library fields.
 
 ---
 
@@ -617,9 +619,9 @@ everything before them unblocks the path to get there.
 - [x] `2.` `GET    /{id}`              — get document metadata
 - [x] `3.` `GET    /{id}/content`      — get raw content
 - [x] `11.` `GET   /{id}/pretty`       — get title + content
-- [ ] `13.` `GET   /{id}/title`        — get title only
-- [ ] `12.` `GET   /{id}/embeddings`   — get embedding vector
-- [ ] `14.` `PUT   /{id}`              — full update
+- [x] `13.` `GET   /{id}/title`        — get title only
+- [x] `12.` `GET   /{id}/embeddings`   — get embedding vector
+- [x] `14.` `PUT   /{id}`              — full update
 - [x] `7.` `PATCH  /{id}/content`      — update content
 - [ ] `15.` `PATCH /{id}/title`        — update title
 - [ ] `16.` `PATCH /{id}/library`      — move to different library

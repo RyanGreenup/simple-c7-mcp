@@ -258,13 +258,18 @@ async def get_document_title(doc_id: str) -> DocumentTitle:
         HTTPException: 404 if document not found.
         HTTPException: 501 if not implemented yet.
 
-    TODO: Implement title retrieval endpoint.
-    TODO: 1. Call document_service.get_document()
-    TODO: 2. Return DocumentTitle with title only
-    TODO: 3. Handle not found errors (404)
-    TODO: 4. Handle other errors (500)
     """
-    raise HTTPException(status_code=501, detail="Not implemented")
+    try:
+        data = document_service.get_document(doc_id)
+        return DocumentTitle(title=data["title"])
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get title: {str(e)}"
+        )
 
 
 @router.get("/{doc_id}/embeddings", response_model=DocumentEmbeddings)
@@ -281,14 +286,22 @@ async def get_document_embeddings(doc_id: str) -> DocumentEmbeddings:
         HTTPException: 404 if document not found or has no embeddings.
         HTTPException: 501 if not implemented yet.
 
-    TODO: Implement embeddings retrieval endpoint.
-    TODO: 1. Call document_service.get_embeddings()
-    TODO: 2. Return DocumentEmbeddings with vectors and metadata
-    TODO: 3. Handle not found errors (404)
-    TODO: 4. Handle no embeddings errors (404 with specific message)
-    TODO: 5. Handle other errors (500)
     """
-    raise HTTPException(status_code=501, detail="Not implemented")
+    try:
+        data = document_service.get_embeddings(doc_id)
+        return DocumentEmbeddings(
+            embeddings=data["embeddings"],
+            dimension=data["dimension"],
+            model=data["model"],
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get embeddings: {str(e)}"
+        )
 
 
 @router.put("/{doc_id}", response_model=DocumentResponse)
@@ -307,14 +320,35 @@ async def update_document(doc_id: str, document: DocumentUpdate) -> DocumentResp
         HTTPException: 404 if target library not found.
         HTTPException: 501 if not implemented yet.
 
-    TODO: Implement document full update endpoint.
-    TODO: 1. Combine update_content, update_title, update_library calls
-    TODO: 2. Transform DocumentData to DocumentResponse
-    TODO: 3. Handle not found errors (404)
-    TODO: 4. Invalidate embeddings after content update
-    TODO: 5. Handle other errors (500)
     """
-    raise HTTPException(status_code=501, detail="Not implemented")
+    try:
+        data = document_service.full_update_document(
+            doc_id=doc_id,
+            title=document.title,
+            content=document.content,
+            library_id=document.library_id,
+        )
+
+        return DocumentResponse(
+            id=data["id"],
+            title=data["title"],
+            library_id=data["library_id"],
+            created_at=data["created_at"],
+            updated_at=data["updated_at"],
+            has_embeddings=data["has_embeddings"],
+        )
+
+    except ValueError as e:
+        error_msg = str(e)
+        if "not found" in error_msg.lower():
+            raise HTTPException(status_code=404, detail=error_msg)
+        else:
+            raise HTTPException(status_code=400, detail=error_msg)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update document: {str(e)}"
+        )
 
 
 @router.patch("/{doc_id}/content", response_model=DocumentResponse)
